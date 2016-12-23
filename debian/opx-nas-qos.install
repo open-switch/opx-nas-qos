@@ -1,0 +1,3 @@
+usr/bin/*
+usr/lib/*/opx/*.py
+lib/systemd/*

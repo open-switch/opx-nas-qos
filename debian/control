@@ -1,0 +1,23 @@
+Source: libopx-nas-qos
+Section: net
+Priority: optional
+Maintainer: Dell <support@dell.com>
+Build-Depends: debhelper (>= 9),dh-autoreconf,dh-systemd,autotools-dev,libopx-common-dev,libopx-cps-dev,libopx-logging-dev,libopx-nas-common-dev,opx-ndi-api-dev,libopx-nas-ndi-dev
+Standards-Version: 3.9.3
+Vcs-Browser: https://github.com/open-switch/opx-nas-qos
+Vcs-Git: https://github.com/open-switch/opx-nas-qos.git
+
+Package: libopx-nas-qos1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common1,opx-cps,libopx-logging1,libopx-nas-common1,libopx-nas-ndi1
+Description: This package contains base QoS functionality for the Openswitch software.
+
+Package: libopx-nas-qos-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common-dev,libopx-cps-dev,libopx-logging-dev,libopx-nas-common-dev,opx-ndi-api-dev,libopx-nas-ndi-dev,libopx-nas-qos1 (=${binary:Version}),libopx-base-model-dev
+Description: This package contains base QoS functionality for the Openswitch software.
+
+Package: opx-nas-qos
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, opx-cps, python-opx-cps, opx-nas-linux
+Description: This package contains base QoS functionality for the Openswitch software.
