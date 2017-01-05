@@ -1,11 +1,7 @@
-opx-nas-qos
-===========
+# opx-nas-qos
+This repository contains base quality of service (QoS) functionality for the NAS software. It provides functions to configure policer, queue, scheduler, mapping as well as port QoS rules.
 
-Quality of service utilities for the Open Swicth Base Module
+## Build
+See [opx-nas-manifest](https://github.com/open-switch/opx-nas-manifest) for more details on the common build tools.  
 
-Description
------------
-
-This repo contains base QoS functionality for the Open Switch Base Module. It provides functions to configure policer, queue, scheduler, mapping as well as port QoS rules.
-
-(c) Dell 2016
+(c) 2017 Dell
