@@ -13,7 +13,7 @@ libopx_nas_qos_la_SOURCES=src/nas_qos_cps_map_entry.cpp src/nas_qos_policer.cpp 
 libopx_nas_qos_la_CPPFLAGS=-D_FILE_OFFSET_BITS=64 -I$(top_srcdir)/inc/opx -I$(includedir)/opx
 libopx_nas_qos_la_CXXFLAGS=-std=c++11
 libopx_nas_qos_la_LDFLAGS=-shared -version-info 1:1:0
-libopx_nas_qos_la_LIBADD=-lopx_logging -lopx_nas_ndi -lopx_cps_class_map -lopx_cps_api_common -lopx_common
+libopx_nas_qos_la_LIBADD=-lopx_logging -lopx_nas_ndi -lopx_cps_api_common -lopx_common -lopx_nas_common
 
 systemdconfdir=/lib/systemd/system
 systemdconf_DATA = scripts/init/*.service
