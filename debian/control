@@ -9,7 +9,7 @@ Vcs-Git: https://github.com/open-switch/opx-nas-qos.git
 
 Package: libopx-nas-qos1
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common1,opx-cps,libopx-logging1,libopx-nas-common1,libopx-nas-ndi1
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common1,libopx-logging1,libopx-nas-common1,libopx-nas-ndi1
 Description: This package contains base QoS functionality for the Openswitch software.
 
 Package: libopx-nas-qos-dev
