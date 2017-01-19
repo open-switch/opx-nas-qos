@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Copyright (c) 2015 Dell Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,10 +13,10 @@
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
 
-export PYTHONPATH=/usr/lib/opx:/usr/lib/x86_64-linux-gnu/opx
+export LD_LIBRARY_PATH=/usr/lib/opx:/usr/lib/x86_64-linux-gnu:/usr/lib:/lib
+export PYTHONPATH=/usr/lib/opx  
 
 if [ -f /etc/opx/base_qos_no_init ] ; then
    exit 0
 fi
-/usr/bin/python /usr/bin/base_qos_init.py
-
+/usr/bin/base_qos_init.py
