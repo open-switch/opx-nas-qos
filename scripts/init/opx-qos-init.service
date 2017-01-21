@@ -1,7 +1,6 @@
 [Unit]
 Description=QoS default initialization
 After=opx-ip.service
-Wants=opx-ip.service
 DefaultDependencies=no
 
 [Service]
