@@ -13,8 +13,7 @@
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
 
-export LD_LIBRARY_PATH=/usr/lib/opx:/usr/lib/x86_64-linux-gnu:/usr/lib:/lib
-export PYTHONPATH=/usr/lib/opx  
+. /etc/opx/opx-environment.sh
 
 if [ -f /etc/opx/base_qos_no_init ] ; then
    exit 0
