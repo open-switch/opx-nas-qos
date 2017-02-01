@@ -1,4 +1,4 @@
-Source: libopx-nas-qos
+Source: opx-nas-qos
 Section: net
 Priority: optional
 Maintainer: Dell EMC <ops-dev@lists.openswitch.net>
