@@ -247,7 +247,7 @@ bool nas_qos_map_entry::push_delete_obj_to_npu (npu_id_t npu_id)
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Delete (Reset) Entry obj on NPU %d", npu_id);
 
-    // Each mapping entry creation is converted into a set_qos_map
+    // Each mapping entry deletion is converted into a set_qos_map
 
     s.key.dot1p = (uint8_t)(this->key.dot1p);
     s.key.dscp = (uint8_t)(this->key.dscp);
@@ -269,11 +269,12 @@ bool nas_qos_map_entry::push_delete_obj_to_npu (npu_id_t npu_id)
     s.value.pg = NDI_DEFAULT_PG;
     if (this->get_type() == NDI_QOS_MAP_TC_TO_QUEUE ||
         this->get_type() == NDI_QOS_MAP_PFC_TO_QUEUE) {
-        if ((rc = get_ndi_qid(s.value.qid)) != STD_ERR_OK) {
+        // reset to default queue id
+        if ((rc = get_ndi_default_qid(s.value.qid)) != STD_ERR_OK) {
             // should not be here!
             EV_LOGGING(QOS, NOTICE, "NAS-QOS", "FAILED to get NDI Qid");
             throw nas::base_exception {rc, __PRETTY_FUNCTION__,
-                "NDI QoS Map Entry Create Failed: NDI qid cannot be resolved"};
+                "NDI QoS Map Entry Delete Failed: NDI qid cannot be resolved"};
         }
     }
 
@@ -334,6 +335,32 @@ t_std_error nas_qos_map_entry::get_ndi_qid(ndi_obj_id_t &ndi_qid)
     }
     return STD_ERR_OK;
 }
+
+t_std_error nas_qos_map_entry::get_ndi_default_qid(ndi_obj_id_t &ndi_qid)
+{
+    BASE_QOS_QUEUE_TYPE_t  queue_type = (BASE_QOS_QUEUE_TYPE_t)GET_KEY2(key);
+
+    switch (queue_type) {
+    case BASE_QOS_QUEUE_TYPE_NONE:
+        ndi_qid = 0;
+        break;
+
+    case BASE_QOS_QUEUE_TYPE_UCAST:
+        ndi_qid = 0;
+        break;
+
+    case BASE_QOS_QUEUE_TYPE_MULTICAST:
+    {   nas_qos_switch & switch_p = const_cast <nas_qos_switch &> (get_switch());
+        ndi_qid = switch_p.ucast_queues_per_port;
+    }
+    break;
+
+    default:
+        return STD_ERR(QOS, CFG, 0);
+    }
+    return STD_ERR_OK;
+}
+
 
 t_std_error  nas_qos_map_entry::get_ndi_map_id(npu_id_t npu_id, ndi_obj_id_t * ndi_map_id)
 {

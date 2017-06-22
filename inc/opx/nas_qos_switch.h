@@ -198,12 +198,14 @@ public:
 
     void            remove_queue (nas_qos_queue_key_t key);
     nas_qos_queue*  get_queue(nas_qos_queue_key_t key);
+    nas_qos_queue*  get_queue(nas_obj_id_t id);
     nas_qos_queue*  get_queue_by_id(ndi_obj_id_t queue_id);
 
     nas_obj_id_t alloc_queue_id () {return (_queue_id_gen.alloc_id () | NAS_QUEUE_ID_TYPE_MASK);}
 
     void release_queue_id(nas_obj_id_t id) {_queue_id_gen.release_id((id & (~NAS_QUEUE_ID_TYPE_MASK)));}
 
+    bool            is_queue_id_obj(nas_obj_id_t id) {return ((id & NAS_QUEUE_ID_TYPE_MASK)? true: false);}
     void            dump_all_queues();
 
     // return the actual number of queues filled
@@ -237,7 +239,7 @@ public:
     nas_obj_id_t alloc_scheduler_group_id () {return _scheduler_group_id_gen.alloc_id () | NAS_SCHEDULER_GROUP_ID_TYPE_MASK;}
 
     void release_scheduler_group_id(nas_obj_id_t id) {_scheduler_group_id_gen.release_id((id & (~NAS_SCHEDULER_GROUP_ID_TYPE_MASK)));}
-
+    bool         is_scheduler_group_obj(nas_obj_id_t id) {return ((id & NAS_SCHEDULER_GROUP_ID_TYPE_MASK) ? true: false);}
     t_std_error     get_port_scheduler_groups(hal_ifindex_t port_id, int match_level,
                                               std::vector<nas_qos_scheduler_group *>& sg_list);
     bool      port_sg_is_initialized(hal_ifindex_t port_id);
@@ -327,5 +329,16 @@ public:
     void                    dump_all_port_egr_profile();
 
     bool                    port_egr_is_initialized(hal_ifindex_t port_id);
+
+    /*****  common nas-id to ndi-id translation functions  *******/
+    ndi_obj_id_t nas2ndi_scheduler_profile_id(nas_obj_id_t id, npu_id_t npu_id);
+    ndi_obj_id_t nas2ndi_scheduler_group_id(nas_obj_id_t id);
+    ndi_obj_id_t nas2ndi_queue_id(nas_obj_id_t id);
+    ndi_obj_id_t nas2ndi_wred_profile_id(nas_obj_id_t id, npu_id_t npu_id);
+    ndi_obj_id_t nas2ndi_map_id(nas_obj_id_t id, npu_id_t npu_id);
+    ndi_obj_id_t nas2ndi_buffer_profile_id(nas_obj_id_t id, npu_id_t npu_id);
+    ndi_obj_id_t nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_id);
+    ndi_obj_id_t nas2ndi_policer_id(nas_obj_id_t policer_id, npu_id_t npu_id);
+
 };
 #endif

@@ -1,3 +1,20 @@
+opx-nas-qos (1.3.0) unstable; urgency=medium
+
+  * Update: Updated code to use the queue index retrieved from SAI
+  * Update: Miscellaneous performance improvements and optimizations
+  * Update: Allow queue-deletion
+  * Update: Enable modification of buffer profile after creation
+  * Update: Disallow removal scheduler group if it is being used
+  * Update: Revise the threshold range value
+  * Update: SAI 1.0 scheduler group and queue changes
+  * Update: SAI 1.0 QoS-queue related change
+  * Update: Miscellaneous performance improvements and optimizations
+  * Feature: Add support for 100g/50g/25g interface support
+  * Bugfix: Miscellaneous bug fixes
+  * Cleanup: Miscellaneous cleanup
+ 
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Tue, 20 Jun 2017 14:45:18 -0800
+
 opx-nas-qos (1.0.1) unstable; urgency=medium
 
   * Initial release.

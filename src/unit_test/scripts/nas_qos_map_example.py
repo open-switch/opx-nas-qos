@@ -81,6 +81,17 @@ def get_map(map_name, map_id):
     print ret_data_list
 
 
+def delete_map_entry(map_name, map_id, entry_list):
+    # delete existing map table entry
+    m = nas_qos.MapCPSObjs(map_name, map_id=map_id)
+    m.del_entries(entry_list)
+    if m.commit() == False:
+        print "Failed to delete entry from " + map_name
+    else:
+        print "Successfully delete entry from " + map_name
+
+
+
 if __name__ == '__main__':
 
     # Each tuple in the list has the following form (dot1p, tc, color)
@@ -99,9 +110,18 @@ if __name__ == '__main__':
     tc2q_id = create_egr_map('tc-to-queue-map', tc2q_entries)
     set_port_egr_map('e101-004-0', tc2q_id, 'tc-to-queue-map')
 
+
+    get_map('tc-to-queue-map', tc2q_id)
+    tc2q_entries_to_delete = [(2, 'UCAST', 1), (2, 'MULTICAST', 1)]
+    delete_map_entry('tc-to-queue-map', tc2q_id, tc2q_entries_to_delete)
+    get_map('tc-to-queue-map', tc2q_id)
+
+
+    get_map('dot1p-to-tc-color-map', d2tc_id)
     mod_list = [(1, 2, 'GREEN'), (2, 6, 'RED')]
     new_list = [(5, 3, 'YELLOW'), (6, 4, 'RED')]
     modify_ing_map('dot1p-to-tc-color-map', d2tc_id, mod_list, new_list)
+    get_map('dot1p-to-tc-color-map', d2tc_id)
 
     ''' not supported yet
     # Each tuple in the list has the following form (tc, color, dot1p)
@@ -112,8 +132,6 @@ if __name__ == '__main__':
     set_port_egr_map('e101-001-0', tc2d_id, 'tc-color-to-dot1p-map')
     '''
 
-    get_map('dot1p-to-tc-color-map', d2tc_id)
-    get_map('tc-to-queue-map', tc2q_id)
     '''
     get_map('tc-color-to-dot1p-map', d2tc_id)
     '''

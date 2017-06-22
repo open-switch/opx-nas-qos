@@ -364,6 +364,10 @@ static t_std_error create_port_ing_profile(uint_t switch_id,
         port_ing.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
         port_ing.mark_ndi_created();
 
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+            "Create port ingress profile: switch %d port %d, pg_num %d, num_pg_id %d, nu_b_p %d\n",
+            switch_id, port_id, p.priority_group_number, p.num_priority_group_id, p.num_buffer_profile);
+
         p_switch->add_port_ingress(port_ing);
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",

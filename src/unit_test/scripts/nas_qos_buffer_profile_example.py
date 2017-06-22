@@ -12,6 +12,9 @@
 #
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
+
+# Before running this test on BASE, do "touch /etc/opt/dell/os10/base_qos_no_init" and reboot
+
 import cps_utils
 import cps
 import nas_qos
@@ -91,7 +94,8 @@ def buffer_profile_modify_attrs(buffer_profile_id, mod_attr_list):
 def buffer_profile_modify_example(buffer_profile_id):
     mod_attrs = [
         ('xoff-threshold', 800),
-        ('xon-threshold', 4000)
+        ('xon-threshold', 1500),
+        ('buffer-size', 3000),
     ]
     return buffer_profile_modify_attrs(buffer_profile_id, mod_attrs)
 
@@ -116,6 +120,10 @@ if __name__ == '__main__':
     buffer_profile_id = buffer_profile_create_example(buffer_pool_id)
     if buffer_profile_id is None:
         exit()
+
+    buffer_profile_get_example(buffer_profile_id)
+
+    buffer_profile_modify_example(buffer_profile_id)
 
     buffer_profile_get_example(buffer_profile_id)
 

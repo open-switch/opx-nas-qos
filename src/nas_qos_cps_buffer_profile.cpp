@@ -84,8 +84,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_profile_write(void * context,
         return nas_qos_cps_api_buffer_profile_create(obj, param->prev);
 
     case cps_api_oper_SET:
-        // All buffer profile parameters are only CREATE_AND_SET
-        return NAS_QOS_E_UNSUPPORTED;
+        return nas_qos_cps_api_buffer_profile_set(obj, param->prev);
 
     case cps_api_oper_DELETE:
         return nas_qos_cps_api_buffer_profile_delete(obj, param->prev);
@@ -171,8 +170,9 @@ static cps_api_return_code_t _append_one_buffer_profile(cps_api_get_params_t * p
             buffer_profile->get_buffer_size());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_THRESHOLD_MODE,
             buffer_profile->get_threshold_mode());
-    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_SHARED_DYNAMIC_THRESHOLD,
-            buffer_profile->get_shared_dynamic_th());
+    uint8_t shared_dyn_th = buffer_profile->get_shared_dynamic_th();
+    cps_api_object_attr_add(ret_obj, BASE_QOS_BUFFER_PROFILE_SHARED_DYNAMIC_THRESHOLD,
+            &shared_dyn_th, sizeof(shared_dyn_th));
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_SHARED_STATIC_THRESHOLD,
             buffer_profile->get_shared_static_th());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_XOFF_THRESHOLD,
@@ -441,6 +441,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
                                               nas_qos_buffer_profile &buffer_profile)
 {
     uint_t val;
+    uint8_t val8;
     char *ptr;
     nas_obj_id_t pool_id;
     cps_api_object_it_t it;
@@ -471,14 +472,14 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         case BASE_QOS_BUFFER_PROFILE_SHARED_DYNAMIC_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            if (val > 0xFF) {
+            val8 = *(uint8_t*)cps_api_object_attr_data_bin(it.attr);
+            if (val8 > 10) {
                 EV_LOGGING(QOS, DEBUG, "QOS",
-                        "Dynamic threshold value %d is beyond supported range (0~255)", val);
+                        "Dynamic threshold value %d is beyond supported range (0~10)", val8);
                 return NAS_QOS_E_ATTR_VAL;
             }
             buffer_profile.mark_attr_dirty(id);
-            buffer_profile.set_shared_dynamic_th(val);
+            buffer_profile.set_shared_dynamic_th(val8);
             break;
 
         case BASE_QOS_BUFFER_PROFILE_SHARED_STATIC_THRESHOLD:
@@ -524,6 +525,8 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                     const nas::attr_set_t attr_set,
                                                     const nas_qos_buffer_profile &buffer_profile)
 {
+    uint8_t val8;
+
     // filling in the keys
     nas_obj_id_t buffer_profile_id = buffer_profile.get_buffer_profile_id();
     cps_api_key_from_attr_with_qual(cps_api_object_key(obj),BASE_QOS_BUFFER_PROFILE_OBJ,
@@ -556,8 +559,8 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
             break;
 
         case BASE_QOS_BUFFER_PROFILE_SHARED_DYNAMIC_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, attr_id,
-                    buffer_profile.get_shared_dynamic_th());
+            val8 = buffer_profile.get_shared_dynamic_th();
+            cps_api_object_attr_add(obj, attr_id, &val8, sizeof(val8));
             break;
 
         case BASE_QOS_BUFFER_PROFILE_SHARED_STATIC_THRESHOLD:

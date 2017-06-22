@@ -75,7 +75,9 @@ bool nas_qos_buffer_profile::push_create_obj_to_npu (npu_id_t npu_id,
     }
 
     ndi_qos_buffer_profile_struct_t cfg = {0};
-    cfg.pool_id = nas2ndi_pool_id(bp->cfg.pool_id, npu_id);
+    nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
+    cfg.pool_id = p_switch.nas2ndi_pool_id(bp->cfg.pool_id, npu_id);
+
     cfg.buffer_size = bp->cfg.buffer_size;
     cfg.threshold_mode = bp->cfg.threshold_mode;
     cfg.shared_dynamic_th = bp->cfg.shared_dynamic_th;
@@ -147,6 +149,7 @@ bool nas_qos_buffer_profile::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
                                            npu_id_t npu_id)
 {
     t_std_error rc = STD_ERR_OK;
+    nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
 
     EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
                     npu_id, attr_id);
@@ -155,7 +158,7 @@ bool nas_qos_buffer_profile::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 
     switch (attr_id) {
     case BASE_QOS_BUFFER_PROFILE_POOL_ID:
-        cfg.pool_id = nas2ndi_pool_id(get_buffer_pool_id(), npu_id);
+        cfg.pool_id = p_switch.nas2ndi_pool_id(get_buffer_pool_id(), npu_id);
         break;
 
     case BASE_QOS_BUFFER_PROFILE_BUFFER_SIZE:
@@ -201,23 +204,3 @@ bool nas_qos_buffer_profile::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
     return true;
 }
 
-ndi_obj_id_t nas_qos_buffer_profile::nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_id)
-{
-    if (pool_id == 0LL) {
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-
-    nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
-
-    nas_qos_buffer_pool* p_pool = p_switch.get_buffer_pool(pool_id);
-
-    if (p_pool == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Pool_id %lld is not found.", pool_id);
-        throw nas::base_exception {rc, __PRETTY_FUNCTION__,
-            "pool Profile id is not created in ndi yet"};
-    }
-
-    return p_pool->ndi_obj_id(npu_id);
-
-}

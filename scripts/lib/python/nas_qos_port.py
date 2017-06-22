@@ -60,6 +60,7 @@ class IngPortCPSObj:
         'tc-to-priority-group-map': ('leaf', 'uint64_t'),
         'priority_group_number': ('leaf', 'uint32_t'),
         'per_priority_flow_control': ('leaf', 'uint8_t'),
+        'buffer-profile-id-list': ('leaf', 'uint64_t'),
     }
 
     @classmethod
@@ -146,6 +147,8 @@ class EgPortCPSObj:
         'tc-color-to-dot1p-map': ('leaf', 'uint64_t'),
         'tc-color-to-dscp-map': ('leaf', 'uint64_t'),
         'pfc-priority-to-queue-map': ('leaf', 'uint64_t'),
+        'queue-id-list': ('leaf', 'uint64_t'),
+        'buffer-profile-id-list': ('leaf', 'uint64_t'),
     }
 
     @classmethod

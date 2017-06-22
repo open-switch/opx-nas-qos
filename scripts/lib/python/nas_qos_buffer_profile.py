@@ -27,7 +27,7 @@ class BufferProfileCPSObj:
         'pool-id': ('leaf', 'uint64_t'),
         'buffer-size': ('leaf', 'uint32_t'),
         'threshold-mode': ('leaf', 'enum', 'base-qos:buffer-threshold-mode:'),
-        'shared-dynamic-threshold': ('leaf', 'uint32_t'),
+        'shared-dynamic-threshold': ('leaf', 'uint8_t'),
         'shared-static-threshold': ('leaf', 'uint32_t'),
         'xoff-threshold': ('leaf', 'uint32_t'),
         'xon-threshold': ('leaf', 'uint32_t'),

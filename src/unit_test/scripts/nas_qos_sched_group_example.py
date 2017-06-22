@@ -12,40 +12,44 @@
 #
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
+
+### This unit test case is strictly used for unit testing purpose.
+### Once it is run, the queue and scheduler group on the port may be altered.
+### To get back to the default HQoS setting, remember to reboot the box.
+
 import cps_utils
 import cps
 import sys
 import nas_qos
 import nas_os_if_utils
+import ifindex_utils
 
 
-def get_port_queue_id_list(port_name, queue_type):
+def get_port_queue_id_list(port_id, queue_type):
     cps_data_list = []
     ret_data_list = []
-
-    ifindex = nas_os_if_utils.name_to_ifindex(port_name)
-    if ifindex is None:
-        print 'Failed to get ifindex for port ', port_name
-        return None
 
     if queue_type == 'ALL':
         queue_type = None
 
-    queue_obj = nas_qos.QueueCPSObj(
-        port_id=ifindex,
-        queue_type=queue_type,
-        queue_number=None)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': None,
+        'port-id': port_id,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
     ret = cps.get([queue_obj.data()], cps_data_list)
 
     if ret == False:
         print 'Failed to get queue list'
         return None
 
+    print '#### Queue list Show ####'
     print '-' * 36
     print '%-16s %-10s %s' % ('id', 'type', 'number')
     print '-' * 36
     for cps_data in cps_data_list:
-        m = nas_qos.QueueCPSObj(None, None, None, cps_data=cps_data)
+        m = nas_qos.QueueCPSObj(cps_data=cps_data)
         queue_id = m.extract_id()
         type_val = m.extract_attr('type')
         local_num = m.extract_attr('queue-number')
@@ -56,8 +60,8 @@ def get_port_queue_id_list(port_name, queue_type):
     return ret_data_list
 
 
-def scheduler_group_create_example(port_name, level):
-    sg_obj = nas_qos.SchedGroupCPSObj(port_name, level)
+def scheduler_group_create_example(attr_list):
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     upd = ('create', sg_obj.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
 
@@ -72,22 +76,34 @@ def scheduler_group_create_example(port_name, level):
     return sg_id
 
 
-def scheduler_group_get_example(sg_id=None, port_name=None, level=None):
+def scheduler_group_get_example(port_id, sg_id=None, level=None):
     return_data_list = []
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=sg_id, port_name=port_name,
-                                      level=level)
+    attr_list = {
+        'port-id': port_id,
+        'level': level,
+        'id': sg_id,
+    }
+    sg_id_list = []
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     ret = cps.get([sg_obj.data()], return_data_list)
     if ret:
         print '#### Scheduler Group Show ####'
         for cps_ret_data in return_data_list:
             m = nas_qos.SchedGroupCPSObj(cps_data=cps_ret_data)
             m.print_obj()
+            sg_id_list.append(m.extract_attr('id'))
     else:
         print 'Error in get'
 
+    print sg_id_list
+    return sg_id_list
 
-def scheduler_group_delete_example(sg_id):
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=sg_id)
+
+def scheduler_group_delete_by_id(sg_id):
+    attr_list = {
+        'id':sg_id,
+    }
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     upd = ('delete', sg_obj.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
 
@@ -99,14 +115,19 @@ def scheduler_group_delete_example(sg_id):
     return ret_cps_data
 
 
-def scheduler_group_cleanup_example(port_name, level):
+def scheduler_group_delete_by_level(port_id, level):
     return_data_list = []
-    sg_obj = nas_qos.SchedGroupCPSObj(port_name=port_name, level=level)
+    attr_list = {
+        'port-id': port_id,
+        'level': level,
+    }
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     ret = cps.get([sg_obj.data()], return_data_list)
     if ret != True:
         print 'Error in get'
         return False
     for cps_ret_data in return_data_list:
+        print cps_ret_data
         m = nas_qos.SchedGroupCPSObj(cps_data=cps_ret_data)
         sg_id = m.extract_id()
         sched_id = m.extract_attr('scheduler-profile-id')
@@ -114,48 +135,88 @@ def scheduler_group_cleanup_example(port_name, level):
             sched_id = 0
         else:
             sched_id = None
-        chld_cnt = m.extract_attr('child_count')
-        if chld_cnt > 0:
-            chld_list = [0]
-        else:
-            chld_list = []
-        ret_sg_id = scheduler_group_modify_example(sg_id, sched_id, chld_list)
+        ret_sg_id = scheduler_group_modify_example(sg_id, sched_id)
         if ret_sg_id is None:
             print 'Falied to modify scheduler-group %d' % sg_id
             return False
-    print 'Successfully cleaned up scheduler-groups of port %s level %d' % (
+
+        ret = scheduler_group_delete_by_id(sg_id)
+        if ret is None:
+            print 'Failed to delete the scheduler-group %d' % sg_id
+            return False
+
+    print 'Successfully delete scheduler-groups of port %s level %d' % (
         port_name, level)
     return True
 
 
-def scheduler_group_delete_all_example(port_name):
-    if scheduler_group_cleanup_example(port_name, 2) == False:
-        return False
-    if scheduler_group_cleanup_example(port_name, 1) == False:
-        return False
-    if scheduler_group_cleanup_example(port_name, 0) == False:
-        return False
+def queue_create_example(port_id, queue_type, queue_number, parent_sg):
+    attr_list = {
+        'port-id': port_id,
+        'type': queue_type,
+        'queue-number': queue_number,
+        'parent': parent_sg,
+    }
+    print port_id, queue_type, queue_number, parent_sg
+
+    q_obj = nas_qos.QueueCPSObj(map_of_attr = attr_list)
+    upd = ('create', q_obj.data())
+    ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
+
+    if ret_cps_data == False:
+        print "Queue creation failed"
+        return None
+
+    print 'Return = ', ret_cps_data
+    q_obj = nas_qos.QueueCPSObj(cps_data=ret_cps_data[0])
+    q_id = q_obj.extract_id()
+    print 'Successfully created queue id %-16x' % q_id
+
+    return q_id
+
+def queue_delete_example(port_id,  queue_type=None, queue_number=None):
     return_data_list = []
-    sg_obj = nas_qos.SchedGroupCPSObj(port_name=port_name)
-    ret = cps.get([sg_obj.data()], return_data_list)
-    if ret != True:
-        print 'Failed to get scheduler-groups of port %s' % port_name
+
+    attr_list = {
+        'port-id': port_id,
+        'type': queue_type,
+        'queue-number': queue_number,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
+    ret = cps.get([queue_obj.data()], return_data_list)
+
+    if ret:
+        for cps_ret_data in return_data_list:
+            m = nas_qos.QueueCPSObj(cps_data=cps_ret_data)
+            q_id = m.extract_attr('id')
+            upd = ('delete', m.data())
+            ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
+            if ret_cps_data == False:
+                print "Queue delete failed"
+                return False
+            else:
+                print "Queue %-16x is deleted" % q_id
+
+    return True
+
+def scheduler_group_delete_all_example(port_id):
+
+    if scheduler_group_delete_by_level(port_id, 2) == False:
         return False
-    for ret_cps_data in return_data_list:
-        ret_sg_obj = nas_qos.SchedGroupCPSObj(cps_data=ret_cps_data)
-        sg_id = ret_sg_obj.extract_id()
-        print 'Delete scheduler-group %d' % sg_id
-        ret = scheduler_group_delete_example(sg_id)
-        if ret is None:
-            print 'Failed to delete scheduler-group'
-            return False
-    print 'Successfully deleted all scheduler-groups of port %s' % port_name
+    if scheduler_group_delete_by_level(port_id, 1) == False:
+        return False
+    if scheduler_group_delete_by_level(port_id, 0) == False:
+        return False
+    print 'Successfully deleted all scheduler-groups of port %d' % port_id
     return True
 
 
-def scheduler_group_modify_example(sg_id, sched_id=None, chld_id_list=[]):
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=sg_id, sched_id=sched_id,
-                                      chld_id_list=chld_id_list)
+def scheduler_group_modify_example(sg_id, sched_id=None):
+    attr_list = {
+        'id': sg_id,
+        'scheduler-profile-id': sched_id,
+    }
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr = attr_list)
     upd = ('set', sg_obj.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
     if ret_cps_data == False:
@@ -244,69 +305,98 @@ if __name__ == '__main__':
         exit()
     print 'Using port %s' % port_name
 
+    port_id = ifindex_utils.if_nametoindex(port_name)
+
+    # Delete all queues
+    if queue_delete_example(port_id) == False:
+        exit()
+    print '####After deleting all queues on port %s' % port_name
+    get_port_queue_id_list(port_id, 'ALL')
+
+    # Creating all queues and attach to L2 SG
+    l2_sg_id_list = scheduler_group_get_example(port_id, None, 2)
+
+    queue_create_example(port_id, 'UCAST', 1, l2_sg_id_list[0])
+    print '####After creating UCAST queue on port %s' % port_name
+    get_port_queue_id_list(port_id, 'ALL')
+
+    queue_create_example(port_id, 'MULTICAST', 1, l2_sg_id_list[0])
+    print '####After creating MCAST queue on port %s' % port_name
+    get_port_queue_id_list(port_id, 'ALL')
+
+    queue_delete_example(port_id, 'UCAST', 1)
+    print '####After deleting UCAST queue on port %s' % port_name
+    get_port_queue_id_list(port_id, 'ALL')
+
+    queue_delete_example(port_id, 'MULTICAST', 1)
+    print '####After deleting MCAST queue on port %s' % port_name
+    get_port_queue_id_list(port_id, 'ALL')
+
+    print 'DONE queue testing'
+
+    # Scheduler-group testing
+    l0_sg_id_list = scheduler_group_get_example(port_id, None, 0)
+
+
     # Delete all existing scheduler-groups
-    ret = scheduler_group_delete_all_example(port_name)
+    ret = scheduler_group_delete_all_example(port_id)
     if ret == False:
         exit()
 
-    # Create scheduler-group
-    sg_id_root = scheduler_group_create_example(port_name, 0)
-    if sg_id_root is None:
-        exit()
-    sg_id_l0 = scheduler_group_create_example(port_name, 1)
-    if sg_id_l0 is None:
-        exit()
-    sg_id_l1_uc = scheduler_group_create_example(port_name, 2)
-    if sg_id_l1_uc is None:
-        exit()
-    sg_id_l1_mc = scheduler_group_create_example(port_name, 2)
-    if sg_id_l1_mc is None:
-        exit()
 
     # Create scheduler profile
     sched_id_l0 = scheduler_profile_create_example(
         'WRR', 50, 100, 100, 500, 100)
     if sched_id_l0 is None:
         exit()
-    sched_id_l1_uc = scheduler_profile_create_example(
+    sched_id_l1 = scheduler_profile_create_example(
         'WRR', 30, 50, 100, 200, 100)
-    if sched_id_l1_uc is None:
+    if sched_id_l1 is None:
         exit()
-    sched_id_l1_mc = scheduler_profile_create_example(
+    sched_id_l2 = scheduler_profile_create_example(
         'WDRR', 30, 50, 100, 200, 100)
-    if sched_id_l1_mc is None:
+    if sched_id_l2 is None:
         exit()
 
-    chld_list = [sg_id_l0]
-    sg_id = scheduler_group_modify_example(sg_id_root, None, chld_list)
-    if sg_id is None:
-        exit()
-    chld_list = [sg_id_l1_uc, sg_id_l1_mc]
-    sg_id = scheduler_group_modify_example(sg_id_l0, sched_id_l0, chld_list)
-    if sg_id is None:
-        exit()
-
-    # Add unicast/multicast queues to L1 scheduler-group
-    queue_id_list = get_port_queue_id_list(port_name, 'UCAST')
-    if queue_id_list is None:
-        print 'Failed to get unicast queue list'
-        exit()
-    sg_id = scheduler_group_modify_example(
-        sg_id_l1_uc,
-        sched_id_l1_uc,
-        queue_id_list)
-    if sg_id is None:
+    # Create scheduler-group
+    # L0
+    attr_list = {
+        # All mandatory attributes
+        'port-id': port_id,
+        'level': 0,
+        'scheduler-profile-id': sched_id_l0,
+        'max-child': 5,
+        'parent': 0,
+    }
+    sg_id_root = scheduler_group_create_example(attr_list)
+    if sg_id_root is None:
         exit()
 
-    queue_id_list = get_port_queue_id_list(port_name, 'MULTICAST')
-    if queue_id_list is None:
-        print 'Failed to get multicast queue list'
-        exit()
-    sg_id = scheduler_group_modify_example(
-        sg_id_l1_mc,
-        sched_id_l1_mc,
-        queue_id_list)
-    if sg_id is None:
+    # L1
+    attr_list = {
+        # All mandatory attributes
+        'port-id': port_id,
+        'level': 1,
+        'scheduler-profile-id': sched_id_l1,
+        'max-child': 2,
+        'parent': sg_id_root,
+    }
+    sg_id_l1 = scheduler_group_create_example(attr_list)
+    if sg_id_l1 is None:
         exit()
 
-    scheduler_group_get_example(port_name=port_name)
+    # L2
+    attr_list = {
+        # All mandatory attributes
+        'port-id': port_id,
+        'level': 2,
+        'scheduler-profile-id': sched_id_l2,
+        'max-child': 2,
+        'parent': sg_id_l1,
+    }
+    sg_id_l2 = scheduler_group_create_example(attr_list)
+    if sg_id_l2 is None:
+        exit()
+
+    # read the tree out
+    scheduler_group_get_example(port_id=port_id)

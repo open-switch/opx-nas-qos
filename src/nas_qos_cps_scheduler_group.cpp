@@ -40,8 +40,7 @@
 #include "nas_switch.h"
 #include "hal_if_mapping.h"
 #include "nas_qos_cps_queue.h"
-
-#define R_1_0_DISABLE_SG_CREATE
+#include "nas_qos_cps_scheduler_group.h"
 
 /* Parse the attributes */
 static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
@@ -65,10 +64,11 @@ static std_mutex_lock_create_static_init_rec(scheduler_group_mutex);
 
 #define MAX_SG_CHILD_NUM 64
 
+// This is used only during initialization to create a local SG node based on SAI default init
 static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
                                     ndi_obj_id_t ndi_sg_id,
                                     const ndi_qos_scheduler_group_struct_t& sg_info,
-                                    ndi_obj_id_t& nas_sg_id)
+                                    nas_obj_id_t& nas_sg_id)
 {
    interface_ctrl_t intf_ctrl;
 
@@ -97,8 +97,12 @@ static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
         sg.set_port_id(port_id);
         sg.set_ndi_obj_id(intf_ctrl.npu_id, ndi_sg_id);
         sg.set_level(sg_info.level);
+        sg.set_max_child(sg_info.max_child);
         sg.clear_all_dirty_flags();
         sg.mark_ndi_created();
+
+        // sg.parent and sg.child_list will be constructed later after
+        // all queues and SG nodes are read from SAI
 
         switch_p->add_scheduler_group(sg);
     }
@@ -109,12 +113,11 @@ static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
     return STD_ERR_OK;
 }
 
-typedef std::unordered_map<ndi_obj_id_t, std::vector<ndi_obj_id_t>> sg_info_list_t;
 
 static t_std_error create_port_scheduler_group_list(const std::vector<ndi_obj_id_t> ndi_sg_id_list,
                                                     npu_id_t npu_id,
                                                     hal_ifindex_t ifindex,
-                                                    sg_info_list_t& sg_info_list)
+                                                    parent_map_t& parent_map)
 {
     ndi_qos_scheduler_group_struct_t sg_info;
     ndi_obj_id_t child_id_list[MAX_SG_CHILD_NUM];
@@ -123,10 +126,12 @@ static t_std_error create_port_scheduler_group_list(const std::vector<ndi_obj_id
         BASE_QOS_SCHEDULER_GROUP_CHILD_LIST,
         BASE_QOS_SCHEDULER_GROUP_PORT_ID,
         BASE_QOS_SCHEDULER_GROUP_LEVEL,
-        BASE_QOS_SCHEDULER_GROUP_SCHEDULER_PROFILE_ID
+        BASE_QOS_SCHEDULER_GROUP_MAX_CHILD,
+        BASE_QOS_SCHEDULER_GROUP_SCHEDULER_PROFILE_ID,
+        BASE_QOS_SCHEDULER_GROUP_PARENT
     };
     t_std_error rc;
-    ndi_obj_id_t nas_sg_id;
+    nas_obj_id_t nas_sg_id;
 
     for (auto ndi_sg_id: ndi_sg_id_list) {
         memset(&sg_info, 0, sizeof(sg_info));
@@ -147,23 +152,21 @@ static t_std_error create_port_scheduler_group_list(const std::vector<ndi_obj_id
             return rc;
         }
         EV_LOGGING(QOS, DEBUG, "QOS",
-                     "Created scheduler-group object: ndi_id 0x%lx nas_id 0x%lx level %d",
-                     ndi_sg_id, nas_sg_id, sg_info.level);
-        std::vector<ndi_obj_id_t> child_list;
-        for (uint_t j = 0; j < sg_info.child_count; j ++) {
-            child_list.push_back(sg_info.child_list[j]);
-        }
-        sg_info_list[nas_sg_id] = std::move(child_list);
+                     "Created scheduler-group object: ndi_id 0x%lx nas_id 0x%lx level %d, parent_ndi_id 0x%lx",
+                     ndi_sg_id, nas_sg_id, sg_info.level, sg_info.parent);
+
+        parent_map[nas_sg_id] = sg_info.parent;
     }
 
     return STD_ERR_OK;
 }
 
 static t_std_error setup_scheduler_group_hierarchy(npu_id_t npu_id,
-                                                   const sg_info_list_t& sg_info_list)
+                                                   const parent_map_t& parent_map)
 {
-    // Setup child list for each scheduler-group object
-    ndi_obj_id_t nas_sg_id, child_id;
+    nas_obj_id_t nas_child_id, nas_parent_id;
+    ndi_obj_id_t ndi_parent_id;
+
     nas_qos_switch *switch_p = nas_qos_get_switch_by_npu(npu_id);
     if (switch_p == NULL) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -171,52 +174,76 @@ static t_std_error setup_scheduler_group_hierarchy(npu_id_t npu_id,
                      npu_id);
         return NAS_QOS_E_FAIL;
     }
-    for (auto& it: sg_info_list) {
-        nas_sg_id = it.first;
-        nas_qos_scheduler_group *sg_p = switch_p->get_scheduler_group(nas_sg_id);
-        if (!sg_p) {
-            EV_LOGGING(QOS, NOTICE, "QOS",
-                         "Couldn't find scheduler-group object for id %lu", nas_sg_id);
-            return NAS_QOS_E_FAIL;
+
+    for (auto& it: parent_map) {
+        nas_child_id = it.first;
+        ndi_parent_id = it.second;
+
+        nas_qos_scheduler_group *parent_sg_p = switch_p->get_scheduler_group_by_id(npu_id, ndi_parent_id);
+
+        if (parent_sg_p == NULL) {
+            nas_parent_id = 0;
         }
-        for (uint_t idx = 0; idx < it.second.size(); idx ++) {
-            if (sg_p->next_level_is_queue()) {
-                nas_qos_queue* queue_p = switch_p->get_queue_by_id(it.second[idx]);
-                if (!queue_p) {
-                    EV_LOGGING(QOS, NOTICE, "QOS",
-                                 "Couldn't find child queue, ndi_id 0x%lx",
-                                 it.second[idx]);
-                    return NAS_QOS_E_FAIL;
-                }
-                queue_p->set_queue_parent_id(sg_p->get_scheduler_group_id());
-                child_id = queue_p->get_queue_id();
-            } else {
-                nas_qos_scheduler_group* child_sg_p =
-                            switch_p->get_scheduler_group_by_id(npu_id,
-                                                                it.second[idx]);
-                if (!child_sg_p) {
-                    EV_LOGGING(QOS, NOTICE, "QOS",
-                                 "Couldn't find child scheduler-group, ndi_id 0x%lx",
-                                 it.second[idx]);
-                    return NAS_QOS_E_FAIL;
-                }
-                child_sg_p->set_scheduler_group_parent_id(sg_p->get_scheduler_group_id());
-                child_id = child_sg_p->get_scheduler_group_id();
-            }
-            sg_p->add_child(child_id);
+        else {
+            nas_parent_id = parent_sg_p->get_scheduler_group_id();
         }
 
-        // clear the dirty flag because this information is read from SAI, not going to SAI
-        sg_p->clear_all_dirty_flags();
+        if (switch_p->is_queue_id_obj(nas_child_id)) {
+            nas_qos_queue *queue = switch_p->get_queue(nas_child_id);
+            if (!queue) {
+                EV_LOGGING(QOS, ERR, "QOS",
+                         "Couldn't find queue object for id %lu", nas_child_id);
+                return NAS_QOS_E_FAIL;
+            }
+
+            if (nas_parent_id == 0) {
+                EV_LOGGING(QOS, NOTICE, "QOS",
+                    "Queue missing a parent scheduler-group object, ndi_obj_id 0x%lx", ndi_parent_id);
+            }
+
+            queue->set_parent(nas_parent_id);
+            queue->clear_all_dirty_flags();
+        }
+        else {
+            nas_qos_scheduler_group *sg_p = switch_p->get_scheduler_group(nas_child_id);
+            if (!sg_p) {
+                EV_LOGGING(QOS, ERR, "QOS",
+                             "Couldn't find scheduler-group object for id %lu", nas_child_id);
+                return NAS_QOS_E_FAIL;
+            }
+
+            if (nas_parent_id == 0 && sg_p->get_level() != 0) {
+                EV_LOGGING(QOS, NOTICE, "QOS",
+                        "Level %d Scheduler Group missing a parent scheduler-group object, ndi_obj_id 0x%lx",
+                          sg_p->get_level(), ndi_parent_id);
+            }
+
+            // update nas-assigned parent-id
+            sg_p->set_parent(nas_parent_id);
+            sg_p->clear_all_dirty_flags();
+        }
+
+
+        if (parent_sg_p) {
+            // update parent's child-list with nas-ids.
+            parent_sg_p->add_child(nas_child_id);
+
+            // clear the dirty flag because this information is read from SAI, not going to SAI
+            parent_sg_p->clear_all_dirty_flags();
+        }
     }
+
+
     return STD_ERR_OK;
 }
 
-t_std_error nas_qos_port_scheduler_group_init(hal_ifindex_t ifindex)
+t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex)
 {
     interface_ctrl_t intf_ctrl;
 
-    if (nas_qos_port_queue_init(ifindex) != STD_ERR_OK) {
+    parent_map_t parent_map;
+
+    if (nas_qos_port_queue_init(ifindex, parent_map) != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                      "Failed to initiate queue for port %lu", ifindex);
         return NAS_QOS_E_FAIL;
@@ -254,7 +281,7 @@ t_std_error nas_qos_port_scheduler_group_init(hal_ifindex_t ifindex)
         return STD_ERR_OK;
     }
 
-    /* get the list of ndi_queue id list */
+    /* get the list of ndi_scheduler_group_id list of the port */
     std::vector<ndi_obj_id_t> ndi_sg_id_list(sg_count);
     if (ndi_qos_get_scheduler_group_id_list(ndi_port_id, sg_count, &ndi_sg_id_list[0]) !=
             sg_count) {
@@ -265,15 +292,15 @@ t_std_error nas_qos_port_scheduler_group_init(hal_ifindex_t ifindex)
     }
 
     t_std_error rc;
-    sg_info_list_t sg_info_list;
     rc = create_port_scheduler_group_list(ndi_sg_id_list, intf_ctrl.npu_id, ifindex,
-                                          sg_info_list);
+                                          parent_map);
     if (rc != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                      "Failed to create scheduler-groups for default hierarchy");
         return rc;
     }
-    rc = setup_scheduler_group_hierarchy(intf_ctrl.npu_id, sg_info_list);
+
+    rc = setup_scheduler_group_hierarchy(intf_ctrl.npu_id, parent_map);
     if (rc != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                      "Failed to setup scheduler-group hierarchy");
@@ -324,7 +351,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
 {
     cps_api_object_t obj = cps_api_object_list_get(param->filters, ix);
     cps_api_object_attr_t sg_attr = cps_api_get_key_data(obj, BASE_QOS_SCHEDULER_GROUP_ID);
-    uint32_t port_id = 0, level;
+    uint32_t port_id = 0, level = 0;
     bool have_port = false, have_level = false;
     if (!sg_attr) {
         cps_api_object_it_t it;
@@ -356,7 +383,8 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
     std_mutex_simple_lock_guard p_m(&scheduler_group_mutex);
 
     if (have_port) {
-        nas_qos_port_scheduler_group_init(port_id);
+        if (nas_qos_port_hqos_init(port_id) != STD_ERR_OK)
+            return NAS_QOS_E_FAIL;
     }
     nas_qos_switch * p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL)
@@ -380,6 +408,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
     cps_api_object_t ret_obj;
 
     for (auto scheduler_group: sg_list) {
+
         ret_obj = cps_api_object_list_create_obj_and_append (param->list);
         if (ret_obj == NULL) {
             EV_LOGGING(QOS, INFO, "NAS-QOS",
@@ -400,7 +429,6 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
         cps_api_object_attr_add_u32(ret_obj,
                                     BASE_QOS_SCHEDULER_GROUP_CHILD_COUNT,
                                     scheduler_group->get_child_count());
-
         for (uint32_t idx = 0; idx < scheduler_group->get_child_count(); idx++) {
             cps_api_object_attr_add_u64(ret_obj,
                                         BASE_QOS_SCHEDULER_GROUP_CHILD_LIST,
@@ -413,6 +441,10 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
                                     scheduler_group->get_level());
         cps_api_object_attr_add_u64(ret_obj, BASE_QOS_SCHEDULER_GROUP_SCHEDULER_PROFILE_ID,
                                     scheduler_group->get_scheduler_profile_id());
+        cps_api_object_attr_add_u32(ret_obj, BASE_QOS_SCHEDULER_GROUP_MAX_CHILD,
+                                    scheduler_group->get_max_child());
+        cps_api_object_attr_add_u64(ret_obj, BASE_QOS_SCHEDULER_GROUP_PARENT,
+                                    scheduler_group->get_parent());
     }
 
     return cps_api_ret_code_OK;
@@ -452,16 +484,9 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
                                 cps_api_object_t obj,
                                 cps_api_object_list_t sav_obj)
 {
-#ifndef R_1_0_DISABLE_SG_CREATE
     nas_obj_id_t scheduler_group_id = 0;
 
-    cps_api_object_attr_t switch_attr = cps_api_get_key_data(obj, BASE_QOS_SCHEDULER_GROUP_SWITCH_ID);
-    if (switch_attr == NULL ) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " switch id not specified in the message\n");
-        return NAS_QOS_E_FAIL;
-    }
-
-    uint_t switch_id = cps_api_object_attr_data_u32(switch_attr);
+    uint32_t switch_id = 0;
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL)
@@ -471,14 +496,6 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
 
     if (nas_qos_cps_parse_attr(obj, scheduler_group) != cps_api_ret_code_OK)
         return NAS_QOS_E_FAIL;
-
-    if (scheduler_group.get_level() == 0 &&
-        scheduler_group.dirty_attr_list().contains(BASE_QOS_SCHEDULER_GROUP_SCHEDULER_PROFILE_ID)) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-                " Scheduler Group Level 0 node does not accept Scheduler Profile ID; "
-                " Use Port Egress Object to configure Scheduler Profile!\n");
-        return NAS_QOS_E_FAIL;
-    }
 
     try {
         scheduler_group_id = p_switch->alloc_scheduler_group_id();
@@ -491,6 +508,11 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
 
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new scheduler_group %u\n",
                      scheduler_group.get_scheduler_group_id());
+
+        if (scheduler_group.dirty_attr_list().contains(BASE_QOS_SCHEDULER_GROUP_PARENT)) {
+            nas_obj_id_t new_parent_id = scheduler_group.get_parent();
+            nas_qos_notify_parent_child_change(switch_id, new_parent_id, scheduler_group_id, true);
+        }
 
         // update obj with new scheduler_group-id key
         cps_api_set_key_data(obj, BASE_QOS_SCHEDULER_GROUP_ID,
@@ -525,7 +547,6 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
         return NAS_QOS_E_FAIL;
     }
 
-#endif
     return cps_api_ret_code_OK;
 }
 
@@ -571,6 +592,12 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
         return NAS_QOS_E_UNSUPPORTED;
     }
 
+    if (scheduler_group.dirty_attr_list().contains(BASE_QOS_SCHEDULER_GROUP_MAX_CHILD)) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                " Scheduler Group Max Child cannot be set after creation\n");
+        return NAS_QOS_E_UNSUPPORTED;
+    }
+
     try {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler_group %u attr on port %u \n",
                      scheduler_group.get_scheduler_group_id(), scheduler_group.get_port_id());
@@ -579,6 +606,14 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
 
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
 
+        if (scheduler_group.dirty_attr_list().contains(BASE_QOS_SCHEDULER_GROUP_PARENT)) {
+            nas_obj_id_t old_parent_id = scheduler_group_p->get_parent();
+            nas_obj_id_t new_parent_id = scheduler_group.get_parent();
+
+            nas_qos_notify_parent_child_change(switch_id, old_parent_id, scheduler_group_id, false);
+            nas_qos_notify_parent_child_change(switch_id, new_parent_id, scheduler_group_id, true);
+
+        }
 
         // set attribute with full copy
         // save rollback info if caller requests it.
@@ -640,6 +675,13 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
         return NAS_QOS_E_FAIL;
     }
 
+    if (scheduler_group_p->get_child_count() > 0) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %u cannot be deleted because it is being referenced.\n",
+                     scheduler_group_id);
+
+        return NAS_QOS_E_FAIL;
+    }
+
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting scheduler_group %u on switch: %u\n",
                  scheduler_group_p->get_scheduler_group_id(), p_switch->id());
 
@@ -651,7 +693,10 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted scheduler_group %u\n",
                      scheduler_group_p->get_scheduler_group_id());
 
-         // save current scheduler_group config for rollback if caller requests it.
+        nas_obj_id_t old_parent_id = scheduler_group_p->get_parent();
+        nas_qos_notify_parent_child_change(switch_id, old_parent_id, scheduler_group_id, false);
+
+        // save current scheduler_group config for rollback if caller requests it.
         // use existing set_mask, existing config
         if (sav_obj) {
             cps_api_object_t tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
@@ -716,6 +761,16 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             scheduler_group.set_scheduler_profile_id(val64);
             break;
 
+        case BASE_QOS_SCHEDULER_GROUP_MAX_CHILD:
+            val = cps_api_object_attr_data_u32(it.attr);
+            scheduler_group.set_max_child(val);
+            break;
+
+        case BASE_QOS_SCHEDULER_GROUP_PARENT:
+            val64 = cps_api_object_attr_data_u64(it.attr);
+            scheduler_group.set_parent(val64);
+            break;
+
         case CPS_API_ATTR_RESERVE_RANGE_END:
             // skip keys
             break;
@@ -769,6 +824,16 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                     scheduler_group.get_scheduler_profile_id());
             break;
 
+        case BASE_QOS_SCHEDULER_GROUP_MAX_CHILD:
+            cps_api_object_attr_add_u32(obj, attr_id,
+                    scheduler_group.get_max_child());
+            break;
+
+        case BASE_QOS_SCHEDULER_GROUP_PARENT:
+            cps_api_object_attr_add_u64(obj, attr_id,
+                    scheduler_group.get_parent());
+            break;
+
         default:
             break;
         }
@@ -790,3 +855,15 @@ static nas_qos_scheduler_group * nas_qos_cps_get_scheduler_group(uint_t switch_i
     return scheduler_group_p;
 }
 
+
+void nas_qos_notify_parent_child_change(uint_t switch_id, nas_obj_id_t parent_id, nas_obj_id_t child_id, bool add)
+{
+    nas_qos_scheduler_group * parent_p = nas_qos_cps_get_scheduler_group(switch_id, parent_id);
+
+    if (parent_p != NULL) {
+        if (add)
+            parent_p->add_child(child_id);
+        else
+            parent_p->del_child(child_id);
+    }
+}

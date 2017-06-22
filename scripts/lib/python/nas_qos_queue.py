@@ -43,29 +43,26 @@ class QueueCPSObj:
         'wred-id': ('leaf', 'uint64_t'),
         'buffer-profile-id': ('leaf', 'uint64_t'),
         'scheduler-profile-id': ('leaf', 'uint64_t'),
+        'parent': ('leaf', 'uint64_t'),
     }
 
     @classmethod
     def get_type_map(cls):
         return cls.type_map
 
-    def __init__(self, queue_type, queue_number,
-                 port_id, switch_id=0, cps_data=None):
+    def __init__(self, switch_id=0, cps_data=None, map_of_attr={}):
 
         if cps_data is not None:
             self.cps_data = cps_data
             return
 
-        self.cps_data = None
         self.cps_obj_wr = utl.CPSObjWrp(self.yang_name, self.get_type_map())
+        self.cps_data = self.cps_obj_wr.get()
+        self.set_attr('switch-id', switch_id)
 
-        if queue_type is not None:
-            self.cps_obj_wr.add_leaf_attr('type', queue_type)
-        if queue_number is not None:
-            self.cps_obj_wr.add_leaf_attr('queue-number', queue_number)
-        if port_id is not None:
-            self.cps_obj_wr.add_leaf_attr('port-id', port_id)
-        self.cps_obj_wr.add_leaf_attr('switch-id', switch_id)
+        for key in map_of_attr:
+            if map_of_attr[key] is not None:
+                self.set_attr(key, map_of_attr[key])
 
     def attrs(self):
         return self.cps_obj_wr.get_attrs()

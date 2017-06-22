@@ -122,7 +122,8 @@ public:
     }
 
     nas_qos_map_entry_value_t get_value() const {return value;}
-    t_std_error get_ndi_qid(ndi_obj_id_t &ndi_qid); //TC-to-queue mapping only
+    t_std_error get_ndi_qid(ndi_obj_id_t &ndi_qid); // TC-to-Queue or PFC-to-Queue mapping
+    t_std_error get_ndi_default_qid(ndi_obj_id_t &ndi_qid); //TC-to-Queue or PFC-to-Queue mapping
 
     /// Overriding base object virtual functions
     const char* name () const override { return "QOS map dot1p to tc entry";}

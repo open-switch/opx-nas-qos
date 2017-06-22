@@ -25,7 +25,9 @@
 
 #include "cps_api_operation.h"
 
+#include <unordered_map>
 
+typedef std::unordered_map<nas_obj_id_t, ndi_obj_id_t> parent_map_t;
 
 /**
   * This function provides NAS-QoS queue CPS API write function
@@ -60,6 +62,6 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
                                             cps_api_transaction_params_t * param,
                                             size_t ix);
 
-t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex);
+t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex, parent_map_t & parent_map);
 
 #endif

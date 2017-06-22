@@ -36,19 +36,15 @@ class nas_qos_port_egress : public nas::base_obj_t
     qos_port_egr_struct_t cfg;
 
     // queue id
+    // This vector replaces cfg.num_queue_id and cfg.queue_id_list
     std::vector<ndi_obj_id_t> _q_id_vec;
 
     // buffer profile list
+    // This vector replaces cfg.num_buffer_profile and cfg.buffer_profile_list
     std::vector<ndi_obj_id_t> _buf_prof_vec;
 
     // cached info
     ndi_port_t ndi_port_id;
-
-    ndi_obj_id_t nas2ndi_map_id(nas_obj_id_t map_id);
-    ndi_obj_id_t nas2ndi_wred_profile_id(nas_obj_id_t wred_profile_id);
-    ndi_obj_id_t nas2ndi_scheduler_profile_id(nas_obj_id_t scheduler_profile_id);
-    ndi_obj_id_t nas2ndi_buffer_profile_id(nas_obj_id_t buffer_profile_id);
-
 
 public:
     nas_qos_port_egress(nas_qos_switch* switch_p, hal_ifindex_t port_id);
@@ -79,39 +75,37 @@ public:
     uint8_t get_num_queue() const { return cfg.num_queue; }
     void set_num_queue(uint8_t num) { cfg.num_queue = num; }
 
-    uint32_t get_queue_id_count() const { return cfg.num_queue_id; }
+    uint32_t get_queue_id_count() const { return _q_id_vec.size(); }
     ndi_obj_id_t get_queue_id(uint32_t idx) const {
-        return cfg.queue_id_list ? cfg.queue_id_list[idx] : 0LL;
+        if (idx < get_queue_id_count())
+            return _q_id_vec[idx];
+        else
+            return 0LL;
     }
     void add_queue_id(ndi_obj_id_t queue_id)
     {
         _q_id_vec.push_back(queue_id);
-        cfg.num_queue_id = _q_id_vec.size();
-        cfg.queue_id_list = &_q_id_vec[0];
     }
     void clear_queue_id()
     {
         _q_id_vec.clear();
-        cfg.num_queue_id = 0;
-        cfg.queue_id_list = &_q_id_vec[0];
     }
 
-    uint32_t get_buffer_profile_id_count() const {return cfg.num_buffer_profile;}
+    uint32_t get_buffer_profile_id_count() const {return _buf_prof_vec.size();}
     ndi_obj_id_t get_buffer_profile_id(uint32_t idx) const {
-        return cfg.buffer_profile_list? cfg.buffer_profile_list[idx]: 0LL;
+        if (idx < get_buffer_profile_id_count())
+            return _buf_prof_vec[idx];
+        else
+            return 0LL;
     }
     void add_buffer_profile_id(ndi_obj_id_t buf_prof_id)
     {
         _buf_prof_vec.push_back(buf_prof_id);
-        cfg.num_buffer_profile = _buf_prof_vec.size();
-        cfg.buffer_profile_list = &_buf_prof_vec[0];
     }
 
     void clear_buf_prof_id()
     {
         _buf_prof_vec.clear();
-        cfg.num_buffer_profile = 0;
-        cfg.buffer_profile_list = &_buf_prof_vec[0];
     }
 
     ndi_obj_id_t get_tc_to_queue_map() const { return cfg.tc_to_queue_map; }

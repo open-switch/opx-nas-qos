@@ -38,19 +38,15 @@ class nas_qos_port_ingress : public nas::base_obj_t
     qos_port_ing_struct_t cfg;
 
     // priority group id
+    // This vector replaces cfg.num_priority_group_id & cfg.priority_group_id_list
     std::vector<ndi_obj_id_t> _pg_id_vec;
 
     // buffer profile id list
+    // This vector replaces cfg.num_buffer_profile & cfg.buffer_profile_list
     std::vector<ndi_obj_id_t> _buf_prof_vec;
 
     // cached info
     ndi_port_t ndi_port_id;
-
-    ndi_obj_id_t nas2ndi_map_id(nas_obj_id_t map_id);
-
-    ndi_obj_id_t nas2ndi_policer_id(nas_obj_id_t policer_id);
-
-    ndi_obj_id_t nas2ndi_buffer_profile_id(nas_obj_id_t buffer_profile_id);
 
 public:
     nas_qos_port_ingress(nas_qos_switch* switch_p, hal_ifindex_t port_id);
@@ -126,39 +122,37 @@ public:
     void set_priority_group_number(uint_t val) {cfg.priority_group_number = val; }
 
     // READ-only PG-list
-    uint32_t get_priority_group_id_count() const { return cfg.num_priority_group_id; }
+    uint32_t get_priority_group_id_count() const { return _pg_id_vec.size(); }
     ndi_obj_id_t get_priority_group_id(uint32_t idx) const {
-        return cfg.priority_group_id_list ? cfg.priority_group_id_list[idx] : 0LL;
+        if (idx < get_priority_group_id_count())
+            return _pg_id_vec[idx];
+        else
+            return 0LL;
     }
     void add_priority_group_id(ndi_obj_id_t priority_group_id)
     {
         _pg_id_vec.push_back(priority_group_id);
-        cfg.num_priority_group_id = _pg_id_vec.size();
-        cfg.priority_group_id_list = &_pg_id_vec[0];
     }
     void clear_priority_group_id()
     {
         _pg_id_vec.clear();
-        cfg.num_priority_group_id = 0;
-        cfg.priority_group_id_list = &_pg_id_vec[0];
     }
 
-    uint32_t get_buffer_profile_id_count() const {return cfg.num_buffer_profile;}
+    uint32_t get_buffer_profile_id_count() const {return _buf_prof_vec.size();}
     ndi_obj_id_t get_buffer_profile_id(uint32_t idx) const {
-        return cfg.buffer_profile_list? cfg.buffer_profile_list[idx]: 0LL;
+        if (idx < get_buffer_profile_id_count())
+            return _buf_prof_vec[idx];
+        else
+            return 0LL;
     }
     void add_buffer_profile_id(ndi_obj_id_t buf_prof_id)
     {
         _buf_prof_vec.push_back(buf_prof_id);
-        cfg.num_buffer_profile = _buf_prof_vec.size();
-        cfg.buffer_profile_list = &_buf_prof_vec[0];
     }
 
     void clear_buf_prof_id()
     {
         _buf_prof_vec.clear();
-        cfg.num_buffer_profile = 0;
-        cfg.buffer_profile_list = &_buf_prof_vec[0];
     }
 
     uint8_t get_per_priority_flow_control() const {return cfg.per_priority_flow_control;};

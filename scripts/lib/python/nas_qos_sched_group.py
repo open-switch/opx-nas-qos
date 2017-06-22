@@ -29,6 +29,8 @@ class SchedGroupCPSObj:
         'scheduler-profile-id': ('leaf', 'uint64_t'),
         'child_count': ('leaf', 'uint32_t'),
         'child-list': ('leaf', 'uint64_t'),
+        'parent': ('leaf', 'uint64_t'),
+        'max-child':('leaf', 'uint32_t'),
     }
 
     @classmethod
@@ -36,8 +38,7 @@ class SchedGroupCPSObj:
         return cls.type_map
 
     def __init__(
-        self, port_name=None, level=None, switch_id=0, sg_id=None,
-            sched_id=None, chld_id_list=[], cps_data=None):
+        self, switch_id=0, cps_data=None, map_of_attr={}):
         if cps_data is not None:
             self.cps_data = cps_data
             return
@@ -45,18 +46,9 @@ class SchedGroupCPSObj:
         self.cps_obj_wr = utl.CPSObjWrp(self.yang_name, self.get_type_map())
         self.cps_data = self.cps_obj_wr.get()
         self.set_attr('switch-id', switch_id)
-        if port_name is not None:
-            port_id = ifindex_utils.if_nametoindex(port_name)
-            self.set_attr('port-id', port_id)
-        if sg_id is not None:
-            self.set_attr('id', sg_id)
-        if level is not None:
-            self.set_attr('level', level)
-        if sched_id is not None:
-            self.set_attr('scheduler-profile-id', sched_id)
-        if chld_id_list is not None and isinstance(chld_id_list, list) and len(chld_id_list) > 0:
-            self.set_attr('child_count', len(chld_id_list))
-            self.set_attr('child-list', chld_id_list)
+        for key in map_of_attr:
+            if map_of_attr[key] is not None:
+                self.set_attr(key, map_of_attr[key])
 
     def attrs(self):
         return self.cps_obj_wr.get_attrs()

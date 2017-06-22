@@ -49,8 +49,10 @@ class MapCPSObjs:
 
     map_attr_names = {
         'dot1p-to-tc-map': (1, 'dot1p', 'tc'),
+        'dot1p-to-color-map': (1, 'dot1p', 'color'),
         'dot1p-to-tc-color-map': (1, 'dot1p', 'tc', 'color'),
         'dscp-to-tc-map': (1, 'dscp', 'tc'),
+        'dscp-to-color-map': (1, 'dscp', 'color'),
         'dscp-to-tc-color-map': (1, 'dscp', 'tc', 'color'),
         'tc-to-queue-map': (2, 'tc', 'type', 'queue-number'),
         'tc-color-to-dot1p-map': (2, 'tc', 'color', 'dot1p'),

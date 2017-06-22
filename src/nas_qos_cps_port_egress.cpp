@@ -79,9 +79,7 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
             port_eg.set_num_queue(*pval);
             break;
         case BASE_QOS_PORT_EGRESS_QUEUE_ID_LIST:
-            lval = cps_api_object_attr_data_u64(it.attr);
-            port_eg.mark_attr_dirty(id);
-            port_eg.add_queue_id(lval);
+            // READ-Only object
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
@@ -409,7 +407,6 @@ static cps_api_return_code_t nas_qos_cps_api_port_eg_set(
 
     /* make a local copy of the existing port egress */
     nas_qos_port_egress port_eg(*port_eg_p);
-    port_eg.clear_queue_id();
 
     if ((rc = nas_qos_cps_parse_attr(obj, port_eg)) != cps_api_ret_code_OK) {
         return rc;
@@ -573,7 +570,7 @@ cps_api_return_code_t nas_qos_cps_api_port_egress_read(void * context,
                                 port_eg->get_tc_color_to_dscp_map());
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP,
                                 port_eg->get_pfc_priority_to_queue_map());
-    for (uint_t idx = 0; idx < port_eg->get_buffer_profile_id_count(); idx++) {
+    for (idx = 0; idx < port_eg->get_buffer_profile_id_count(); idx++) {
         cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST,
                                     port_eg->get_buffer_profile_id(idx));
     }

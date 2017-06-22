@@ -216,6 +216,26 @@ def bind_obj_to_port(attr_name, obj_id, direction, ifname):
             ifname)
 
 
+def get_speed_str_by_iftype_speed(iftype, speed):
+    if (iftype == 'base-if:cpu'):
+        return 'cpu'
+    elif speed == 1000:
+        return '1g'
+    elif speed == 10000:
+        return '10g'
+    elif speed == 25000:
+        return '25g'
+    elif speed == 40000:
+        return '40g'
+    elif speed == 50000:
+        return '50g'
+    elif speed == 100000:
+        return '100g'
+    else:
+        return'unsupported'
+
+
+
 def init_sched_tree_on_port(xnode_sched_tree, lookup_sched_prof, lookup_buf_prof, ifidx, ifname, iftype, speed=0):
 
     # 1st pass - Read all scheduler groups and scheduler profile settings
@@ -254,16 +274,7 @@ def init_sched_tree_on_port(xnode_sched_tree, lookup_sched_prof, lookup_buf_prof
                     # Front panel port
                     # construct the default buffer_profile_name as
                     # 'default-none-egr-10g' for example
-                    if (iftype == 'base-if:cpu'):
-                        speed_str = 'cpu'
-                    elif speed == 1000:
-                        speed_str = '1g'
-                    elif speed == 10000:
-                        speed_str = '10g'
-                    elif speed == 40000:
-                        speed_str = '40g'
-                    else:
-                        speed_str = 'unsupported'
+                    speed_str = get_speed_str_by_iftype_speed(iftype, speed)
                     if ('buffer-profile' in xnode_queue.attrib):
                         buffer_profile_name = xnode_queue.attrib['buffer-profile'] + '-egr-' + speed_str
                         if (buffer_profile_name in lookup_buf_prof):
@@ -281,16 +292,7 @@ def init_sched_tree_on_port(xnode_sched_tree, lookup_sched_prof, lookup_buf_prof
 def init_pg_on_port(xnode_obj, lookup_buf_prof, ifidx, ifname, iftype, speed):
 
     local_id = xnode_obj.attrib['local-id']
-    if (iftype == 'base-if:cpu'):
-        speed_str = 'cpu'
-    elif speed == 1000:
-        speed_str = '1g'
-    elif speed == 10000:
-        speed_str = '10g'
-    elif speed == 40000:
-        speed_str = '40g'
-    else:
-        speed_str = 'unsupported'
+    speed_str = get_speed_str_by_iftype_speed(iftype, speed)
     buffer_profile_name = xnode_obj.attrib['buffer-profile'] + '-ing-' + speed_str
     buffer_profile_id = None
     if (buffer_profile_name in lookup_buf_prof):
@@ -328,8 +330,10 @@ def get_sched_grp(level, sg_number, sg_info):
 def read_sched_grp(ifidx, ifname):
     sg_info = {}
     return_data_list = []
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=None, port_name=ifname,
-                                      level=None)
+    attr_list = {
+        'port-id': ifidx,
+    }
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     ret = cps.get([sg_obj.data()], return_data_list)
     if ret:
         #print '#### Scheduler Group Show ####'
@@ -394,7 +398,7 @@ def create_buf_profile(xnode_profile, ingress_pool_id, egress_pool_id):
         pool_id = ingress_pool_id
 
     list_of_attrs_in_kb = {'buffer-size', 'shared-static-threshold',
-                           'shared-dynamic-threshold', 'xoff-threshold', 'xon-threshold'}
+                           'xoff-threshold', 'xon-threshold'}
     for key in attrs:
         if key in list_of_attrs_in_kb:
             if attrs[key] != '0':
@@ -417,40 +421,13 @@ def create_buf_profile(xnode_profile, ingress_pool_id, egress_pool_id):
     return buf_prof_id
 
 
-
-def create_sched_grp(port_name, level, sched_grp_name):
-    sg_obj = nas_qos.SchedGroupCPSObj(port_name, level)
-    upd = ('create', sg_obj.data())
-    ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
-
-    if ret_cps_data == False:
-        raise RuntimeError(
-            'Port {0} Scheduler Group {1} creation failed',
-            port_name,
-            sched_grp_name)
-
-    sg_obj = nas_qos.SchedGroupCPSObj(cps_data=ret_cps_data[0])
-    sg_id = sg_obj.extract_id()
-    return sg_id
-
-
-
-def add_child_to_sched_grp(sg_id, child_list, sched_grp_name):
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=sg_id,
-                                      chld_id_list=child_list)
-    upd = ('set', sg_obj.data())
-    ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
-    if ret_cps_data == False:
-        raise RuntimeError(
-            "FAILED to add child nodes to {0}".format(sched_grp_name))
-    dbg_print(
-        "         > Successfully added child nodes to {0}".format(sched_grp_name))
-
-
 def bind_q_profile(key_tuple, scheduler_profile_id, buffer_profile_id):
-    q_obj = nas_qos.QueueCPSObj(
-        port_id=key_tuple[0], queue_type=key_tuple[1],
-        queue_number=key_tuple[2])
+    attr_list = {
+        'port-id': key_tuple[0],
+        'type': key_tuple[1],
+        'queue-number': key_tuple[2],
+    }
+    q_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
     q_obj.set_attr('scheduler-profile-id', scheduler_profile_id)
     if (buffer_profile_id):
         q_obj.set_attr('buffer-profile-id', buffer_profile_id)
@@ -470,7 +447,11 @@ def bind_q_profile(key_tuple, scheduler_profile_id, buffer_profile_id):
 
 def bind_sched_profile(sg_id, prof_name, sched_lookup, sched_grp_name):
     sched_id = sched_lookup[prof_name]
-    sg_obj = nas_qos.SchedGroupCPSObj(sg_id=sg_id, sched_id=sched_id)
+    attr_list = {
+        'id': sg_id,
+        'scheduler-profile-id': sched_id,
+    }
+    sg_obj = nas_qos.SchedGroupCPSObj(map_of_attr=attr_list)
     upd = ('set', sg_obj.data())
     r = cps_utils.CPSTransaction([upd]).commit()
     if r == False:
@@ -504,10 +485,12 @@ def get_map_entry(xnode_map_tbl, xnode_map_entry):
 
 
 def get_port_queue_id(ifidx, queue_type, q_num, ifname):
-    queue_obj = nas_qos.QueueCPSObj(
-        port_id=ifidx,
-        queue_type=queue_type,
-        queue_number=q_num)
+    attr_list = {
+        'port-id': ifidx,
+        'type': queue_type,
+        'queue-number': q_num,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
     cps_data_list = []
     ret = cps.get([queue_obj.data()], cps_data_list)
 
@@ -519,7 +502,7 @@ def get_port_queue_id(ifidx, queue_type, q_num, ifname):
                 q_num,
                 ifidx))
 
-    m = nas_qos.QueueCPSObj(None, None, None, cps_data=cps_data_list[0])
+    m = nas_qos.QueueCPSObj(cps_data=cps_data_list[0])
     queue_id = m.extract_id()
     dbg_print(
         "           > Intf {4}({0}) {1} Q{2} = QID 0x{3:X}".format(

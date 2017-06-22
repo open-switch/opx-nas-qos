@@ -39,6 +39,11 @@ class PriorityGroupStatCPSObj:
         'bytes':('leaf', 'uint64_t'),
         'current-occupancy-bytes':('leaf', 'uint64_t'),
         'watermark-bytes':('leaf', 'uint64_t'),
+        'shared-current-occupancy-bytes':('leaf', 'uint64_t'),
+        'shared-watermark-bytes':('leaf', 'uint64_t'),
+        'xoff-room-current-occupancy-bytes':('leaf', 'uint64_t'),
+        'xoff-room-watermark-bytes':('leaf', 'uint64_t'),
+
     }
     @classmethod
     def get_type_map (cls):
@@ -59,8 +64,10 @@ class PriorityGroupStatCPSObj:
             self.cps_obj_wr.add_leaf_attr ('local-id', local_id)
 
         # add supported stats to pull here
+        self.cps_obj_wr.add_leaf_attr ('packets', 0)
+        self.cps_obj_wr.add_leaf_attr ('bytes', 0)
         self.cps_obj_wr.add_leaf_attr ('current-occupancy-bytes', 0)
-        self.cps_obj_wr.add_leaf_attr ('watermark-bytes', 0)
+        self.cps_obj_wr.add_leaf_attr ('shared-current-occupancy-bytes', 0)
 
 
     def attrs (self):

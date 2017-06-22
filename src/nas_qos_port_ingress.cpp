@@ -92,58 +92,6 @@ bool nas_qos_port_ingress::is_leaf_attr (nas_attr_id_t attr_id)
     return (_leaf_attr_map.at(static_cast<BASE_QOS_PORT_INGRESS_t>(attr_id)));
 }
 
-ndi_obj_id_t nas_qos_port_ingress::nas2ndi_map_id(nas_obj_id_t map_id)
-{
-    if (map_id == 0LL) {
-        //map_id 0 is used to remove map from port
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-    nas_qos_switch& switch_r = const_cast<nas_qos_switch&>(get_switch());
-    nas_qos_map* p_map = switch_r.get_map(map_id);
-    if (p_map == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "Map id is not created in ndi yet"};
-    }
-
-    return p_map->ndi_obj_id(ndi_port_id.npu_id);
-}
-
-ndi_obj_id_t nas_qos_port_ingress::nas2ndi_policer_id(nas_obj_id_t policer_id)
-{
-    if (policer_id == 0LL) {
-        //policer_id 0 is used to remove policer from port
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-    nas_qos_switch& switch_r = const_cast<nas_qos_switch&>(get_switch());
-    nas_qos_policer* p_policer = switch_r.get_policer(policer_id);
-    if (p_policer == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "Policer id is not created in ndi yet"};
-    }
-
-    return p_policer->ndi_obj_id(ndi_port_id.npu_id);
-}
-
-ndi_obj_id_t nas_qos_port_ingress::nas2ndi_buffer_profile_id(nas_obj_id_t buf_prof_id)
-{
-    if (buf_prof_id == 0LL) {
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-
-    nas_qos_switch& switch_r = const_cast<nas_qos_switch&>(get_switch());
-    nas_qos_buffer_profile* p_buffer_profile = switch_r.get_buffer_profile(buf_prof_id);
-    if (p_buffer_profile == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "buffer_profile id is not created in ndi yet"};
-    }
-
-    return p_buffer_profile->ndi_obj_id(ndi_port_id.npu_id);
-
-}
-
 bool nas_qos_port_ingress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
                                                  npu_id_t npu_id)
 {
@@ -154,62 +102,63 @@ bool nas_qos_port_ingress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
                     npu_id, attr_id);
 
     qos_port_ing_struct_t cfg= {0};
+    nas_qos_switch& p_switch = const_cast <nas_qos_switch &> (get_switch());
 
     switch (attr_id) {
     case BASE_QOS_PORT_INGRESS_DEFAULT_TRAFFIC_CLASS:
         cfg.default_tc = get_default_traffic_class();
         break;
     case BASE_QOS_PORT_INGRESS_DOT1P_TO_TC_MAP:
-        cfg.dot1p_to_tc_map = nas2ndi_map_id(get_dot1p_to_tc_map());
+        cfg.dot1p_to_tc_map = p_switch.nas2ndi_map_id(get_dot1p_to_tc_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_DOT1P_TO_COLOR_MAP:
-        cfg.dot1p_to_color_map = nas2ndi_map_id(get_dot1p_to_color_map());
+        cfg.dot1p_to_color_map = p_switch.nas2ndi_map_id(get_dot1p_to_color_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_DOT1P_TO_TC_COLOR_MAP:
-        cfg.dot1p_to_tc_color_map = nas2ndi_map_id(get_dot1p_to_tc_color_map());
+        cfg.dot1p_to_tc_color_map = p_switch.nas2ndi_map_id(get_dot1p_to_tc_color_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_DSCP_TO_TC_MAP:
-        cfg.dscp_to_tc_map = nas2ndi_map_id(get_dscp_to_tc_map());
+        cfg.dscp_to_tc_map = p_switch.nas2ndi_map_id(get_dscp_to_tc_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_DSCP_TO_COLOR_MAP:
-        cfg.dscp_to_color_map = nas2ndi_map_id(get_dscp_to_color_map());
+        cfg.dscp_to_color_map = p_switch.nas2ndi_map_id(get_dscp_to_color_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_DSCP_TO_TC_COLOR_MAP:
-        cfg.dscp_to_tc_color_map = nas2ndi_map_id(get_dscp_to_tc_color_map());
+        cfg.dscp_to_tc_color_map = p_switch.nas2ndi_map_id(get_dscp_to_tc_color_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_TC_TO_QUEUE_MAP:
-        cfg.tc_to_queue_map = nas2ndi_map_id(get_tc_to_queue_map());
+        cfg.tc_to_queue_map = p_switch.nas2ndi_map_id(get_tc_to_queue_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_FLOW_CONTROL:
         cfg.flow_control = (BASE_QOS_FLOW_CONTROL_t)get_flow_control();
         break;
     case BASE_QOS_PORT_INGRESS_POLICER_ID:
-        cfg.policer_id = nas2ndi_policer_id(get_policer_id());
+        cfg.policer_id = p_switch.nas2ndi_policer_id(get_policer_id(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_FLOOD_STORM_CONTROL:
         cfg.flood_storm_control =
-                nas2ndi_policer_id(get_flood_storm_control());
+                p_switch.nas2ndi_policer_id(get_flood_storm_control(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_BROADCAST_STORM_CONTROL:
         cfg.bcast_storm_control =
-                nas2ndi_policer_id(get_broadcast_storm_control());
+                p_switch.nas2ndi_policer_id(get_broadcast_storm_control(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_MULTICAST_STORM_CONTROL:
         cfg.mcast_storm_control =
-                nas2ndi_policer_id(get_multicast_storm_control());
+                p_switch.nas2ndi_policer_id(get_multicast_storm_control(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_TC_TO_PRIORITY_GROUP_MAP:
         cfg.tc_to_priority_group_map =
-                nas2ndi_map_id(get_tc_to_priority_group_map());
+                p_switch.nas2ndi_map_id(get_tc_to_priority_group_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_PRIORITY_GROUP_TO_PFC_PRIORITY_MAP:
         cfg.priority_group_to_pfc_priority_map =
-                nas2ndi_map_id(get_priority_group_to_pfc_priority_map());
+                p_switch.nas2ndi_map_id(get_priority_group_to_pfc_priority_map(), npu_id);
         break;
     case BASE_QOS_PORT_INGRESS_BUFFER_PROFILE_ID_LIST:
         cfg.num_buffer_profile = get_buffer_profile_id_count();
         for (uint i = 0; i< cfg.num_buffer_profile; i++)
-            buf_prof_vec.push_back(nas2ndi_buffer_profile_id(_buf_prof_vec[i]));
+            buf_prof_vec.push_back(p_switch.nas2ndi_buffer_profile_id(_buf_prof_vec[i], npu_id));
         cfg.buffer_profile_list = &buf_prof_vec[0];
         break;
     case BASE_QOS_PORT_INGRESS_PER_PRIORITY_FLOW_CONTROL:

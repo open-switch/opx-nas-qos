@@ -146,6 +146,17 @@ nas_qos_queue * nas_qos_switch::get_queue_by_id(ndi_obj_id_t queue_id)
     return NULL;
 }
 
+nas_qos_queue * nas_qos_switch::get_queue(nas_obj_id_t id)
+{
+    for (auto& queue_info: queues) {
+        if (queue_info.second.get_queue_id() == id) {
+            return &queue_info.second;
+        }
+    }
+    return NULL;
+}
+
+
 void nas_qos_switch::dump_all_queues()
 {
     for (auto queue:  queues) {
@@ -642,4 +653,136 @@ bool nas_qos_switch::port_egr_is_initialized(hal_ifindex_t port_id)
 {
     port_egr_iter_t it = port_egrs.find(port_id);
     return (it != port_egrs.end());
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_scheduler_profile_id(nas_obj_id_t id, npu_id_t npu_id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_scheduler* p_scheduler = get_scheduler(id);
+
+    if (p_scheduler == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler Profile id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "scheduler profile not found"};
+    }
+
+    return p_scheduler->ndi_obj_id(npu_id);
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_scheduler_group_id(nas_obj_id_t id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_scheduler_group* p = get_scheduler_group(id);
+
+    if (p == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler group id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "scheduler group not found"};
+    }
+
+    return p->ndi_obj_id(0);
+}
+
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_queue_id(nas_obj_id_t id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_queue *p = get_queue(id);
+
+    if (p == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "Queue id not found"};
+    }
+
+    return p->ndi_obj_id();
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_wred_profile_id(nas_obj_id_t id, npu_id_t npu_id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_wred* p_wred = get_wred(id);
+    if (p_wred == NULL){
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "WRED Profile id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
+            "WRED Profile id is not found in ndi yet"};
+    }
+
+    return p_wred->ndi_obj_id(npu_id);
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_map_id(nas_obj_id_t id, npu_id_t npu_id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_map* p_map = get_map(id);
+    if (p_map == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "map id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
+            "Map id is not found in ndi yet"};
+    }
+
+    return p_map->ndi_obj_id(npu_id);
+}
+
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_buffer_profile_id(nas_obj_id_t id, npu_id_t npu_id)
+{
+    if (id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_buffer_profile* p_buffer_profile = get_buffer_profile(id);
+    if (p_buffer_profile == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "buffer profile id %lld is not found.", id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
+            "Buffer Profile id is not created in ndi yet"};
+    }
+
+    return p_buffer_profile->ndi_obj_id(npu_id);
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_id)
+{
+    if (pool_id == 0LL) {
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_buffer_pool* p_pool = get_buffer_pool(pool_id);
+
+    if (p_pool == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Pool_id %lld is not found.", pool_id);
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
+            "Pool id is not created in ndi yet"};
+    }
+
+    return p_pool->ndi_obj_id(npu_id);
+}
+
+ndi_obj_id_t nas_qos_switch::nas2ndi_policer_id(nas_obj_id_t policer_id, npu_id_t npu_id)
+{
+    if (policer_id == 0LL) {
+        //policer_id 0 is used to remove policer from port
+        return NDI_QOS_NULL_OBJECT_ID;
+    }
+
+    nas_qos_policer* p_policer = get_policer(policer_id);
+    if (p_policer == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Policer_id %lld is not found.", policer_id);
+        throw nas::base_exception{NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
+                "Policer id is not created in ndi yet"};
+    }
+
+    return p_policer->ndi_obj_id(npu_id);
 }

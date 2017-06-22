@@ -39,19 +39,17 @@ def get_port_queue_id(ifname, queue_number, queue_type):
     return_data_list = []
     port_id = ifindex_utils.if_nametoindex(ifname)
 
-    queue_obj = QueueCPSObj(
-        queue_type=queue_type,
-        queue_number=queue_number,
-        port_id=port_id)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': queue_number,
+        'port-id': port_id,
+    }
+    queue_obj = QueueCPSObj(map_of_attr=attr_list)
     ret = cps.get([queue_obj.data()], return_data_list)
 
     if ret:
         for cps_ret_data in return_data_list:
-            m = QueueCPSObj(
-                port_id=port_id,
-                queue_type=queue_type,
-                queue_number=queue_number,
-                cps_data=cps_ret_data)
+            m = QueueCPSObj(cps_data=cps_ret_data)
             if (m.extract_attr('type') == queue_type and
                     m.extract_attr('queue-number') == queue_number):
                 return m.extract_id()
@@ -85,8 +83,14 @@ def get_parent_sched_group_id(ifname, child_id):
     # find the parent with a matching child qid
     sg_info = {}
     return_data_list = []
-    sg_obj = SchedGroupCPSObj(sg_id=None, port_name=ifname,
-                              level=None)
+
+    port_id = ifindex_utils.if_nametoindex(ifname)
+    attr_list = {
+        'port-id': port_id,
+        'level': None,
+        'id': None,
+    }
+    sg_obj = SchedGroupCPSObj(map_of_attr=attr_list)
     ret = cps.get([sg_obj.data()], return_data_list)
     if ret:
         for cps_ret_data in return_data_list:

@@ -42,7 +42,7 @@ typedef struct nas_qos_buffer_profile_struct{
     nas_obj_id_t pool_id;         // pool id for the buffer profile
     uint32_t buffer_size;     // reserved buffer size in bytes
     BASE_QOS_BUFFER_THRESHOLD_MODE_t threshold_mode;    // buffer threshold mode
-    uint32_t shared_dynamic_th; // dynamic threshold for the shared usage: 1/n of available buffer of the pool
+    uint8_t  shared_dynamic_th; // index to a pre-defined Alpha value
     uint32_t shared_static_th;  // static threshold for the shared usage in bytes
     uint32_t xoff_th;   // XOFF threshold in bytes
     uint32_t xon_th;    // XON threshold in bytes
@@ -84,8 +84,8 @@ public:
     BASE_QOS_BUFFER_THRESHOLD_MODE_t get_threshold_mode() const {return cfg.threshold_mode;}
     void     set_threshold_mode(BASE_QOS_BUFFER_THRESHOLD_MODE_t mode) {cfg.threshold_mode = mode;}
 
-    uint32_t get_shared_dynamic_th() const {return cfg.shared_dynamic_th;}
-    void     set_shared_dynamic_th(uint32_t th) {cfg.shared_dynamic_th = th;}
+    uint8_t  get_shared_dynamic_th() const {return cfg.shared_dynamic_th;}
+    void     set_shared_dynamic_th(uint8_t th) {cfg.shared_dynamic_th = th;}
 
     uint32_t get_shared_static_th() const { return cfg.shared_static_th;}
     void     set_shared_static_th(uint32_t th) {cfg.shared_static_th = th;}
@@ -101,8 +101,6 @@ public:
         strncpy(cfg.name, name, sizeof(cfg.name));
         cfg.name[BUFFER_PROFILE_NAME_LEN-1] = 0;
     }
-
-    ndi_obj_id_t nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_id);
 
     /// Overriding base object virtual functions
     virtual const char* name () const override { return "QOS buffer_profile";}

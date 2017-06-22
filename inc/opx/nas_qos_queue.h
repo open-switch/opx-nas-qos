@@ -54,6 +54,12 @@ typedef struct nas_qos_queue_key_t {
 
 } nas_qos_queue_key_t;
 
+typedef struct nas_qos_queue_struct {
+    nas_obj_id_t    parent;
+    nas_obj_id_t    wred_id;
+    nas_obj_id_t    buffer_profile;
+    nas_obj_id_t    scheduler_profile;
+} nas_qos_queue_struct_t;
 
 class nas_qos_queue : public nas::base_obj_t
 {
@@ -61,20 +67,17 @@ class nas_qos_queue : public nas::base_obj_t
     nas_qos_queue_key_t key;
 
     // attributes
-    nas_obj_id_t    queue_id;
-    nas_obj_id_t    wred_id;
-    nas_obj_id_t    buffer_profile;
-    nas_obj_id_t    scheduler_profile;
+    nas_qos_queue_struct_t cfg;
 
-    nas_obj_id_t    parent_id;
+    // NAS-assigned queue id
+    nas_obj_id_t    queue_id;
 
     // cached info
-    ndi_port_t           ndi_port_id; // derived from nas_queue_key.port_id, i.e. ifIndex
+    ndi_port_t      ndi_port_id; // derived from nas_queue_key.port_id, i.e. ifIndex
 
     // List of mapped NDI IDs (Only one for each queue)
     // managed by this NAS component
     nas::ndi_obj_id_table_t        _ndi_obj_ids;
-
 
 
 public:
@@ -89,28 +92,26 @@ public:
     nas_obj_id_t  get_queue_id() {return queue_id;}
     void           set_queue_id(nas_obj_id_t val) {queue_id = val;}
 
-    nas_obj_id_t get_queue_parent_id() {return parent_id;}
-    void    set_queue_parent_id(nas_obj_id_t id) {parent_id = id;}
-    bool    is_queue_attached() {
-        return (parent_id != NDI_QOS_NULL_OBJECT_ID);
-    }
-
     nas_qos_queue_key_t get_key() {return key;}
     hal_ifindex_t  get_port_id() const {return key.port_id;}
     BASE_QOS_QUEUE_TYPE_t get_type() const {return key.type;}
     uint32_t get_local_queue_id() const {return key.local_queue_id;}
 
     // User configurable attributes
+    bool is_parent_set() {return _set_attributes.contains(BASE_QOS_QUEUE_PARENT);}
+    nas_obj_id_t get_parent() const {return cfg.parent;}
+    void     set_parent(nas_obj_id_t id);
+
     bool is_wred_id_set() { return _set_attributes.contains(BASE_QOS_QUEUE_WRED_ID);}
-    nas_obj_id_t get_wred_id() const {return wred_id;}
-    void     set_wred_id(nas_obj_id_t id);
+    nas_obj_id_t get_wred_id() const {return cfg.wred_id;}
+    void    set_wred_id(nas_obj_id_t id);
 
     bool is_buffer_profile_set() {return _set_attributes.contains(BASE_QOS_QUEUE_BUFFER_PROFILE_ID);}
-    nas_obj_id_t get_buffer_profile() const {return buffer_profile;}
+    nas_obj_id_t get_buffer_profile() const {return cfg.buffer_profile;}
     void    set_buffer_profile(nas_obj_id_t id);
 
     bool is_scheduler_profile_set() {return _set_attributes.contains(BASE_QOS_QUEUE_SCHEDULER_PROFILE_ID);}
-    nas_obj_id_t get_scheduler_profile() const {return scheduler_profile;}
+    nas_obj_id_t get_scheduler_profile() const {return cfg.scheduler_profile;}
     void    set_scheduler_profile(nas_obj_id_t id);
 
     bool  opaque_data_to_cps (cps_api_object_t cps_obj) const;
@@ -161,22 +162,28 @@ inline void nas_qos_queue::set_ndi_port_id(npu_id_t npu_id, npu_port_t npu_port_
     ndi_port_id.npu_port = npu_port_id;
 }
 
+inline void nas_qos_queue::set_parent(nas_obj_id_t id)
+{
+    mark_attr_dirty(BASE_QOS_QUEUE_PARENT);
+    cfg.parent = id;
+}
+
 inline void nas_qos_queue::set_wred_id(nas_obj_id_t id)
 {
     mark_attr_dirty(BASE_QOS_QUEUE_WRED_ID);
-    wred_id = id;
+    cfg.wred_id = id;
 }
 
 inline void    nas_qos_queue::set_buffer_profile(nas_obj_id_t id)
 {
     mark_attr_dirty(BASE_QOS_QUEUE_BUFFER_PROFILE_ID);
-    buffer_profile = id;
+    cfg.buffer_profile = id;
 }
 
 inline void nas_qos_queue::set_scheduler_profile(nas_obj_id_t id)
 {
     mark_attr_dirty(BASE_QOS_QUEUE_SCHEDULER_PROFILE_ID);
-    scheduler_profile = id;
+    cfg.scheduler_profile = id;
 }
 
 /* Debugging and unit testing */

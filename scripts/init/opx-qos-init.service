@@ -1,16 +1,12 @@
 [Unit]
 Description=QoS default initialization
-After=opx-ip.service
-DefaultDependencies=no
+After=opx-cps.service
+Wants=opx-cps.service
 
 [Service]
 Type=oneshot
-EnvironmentFile=/etc/opx/opx-environment
-ExecStart=/usr/bin/base_qos_init.sh
 RemainAfterExit=yes
-
-# Resource Limitations
-LimitNOFILE=16384
+ExecStart=/usr/bin/base_qos_init.sh
 
 [Install]
 WantedBy=multi-user.target

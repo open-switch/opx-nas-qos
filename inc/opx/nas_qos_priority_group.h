@@ -139,6 +139,10 @@ inline void nas_qos_priority_group::set_ndi_port_id(npu_id_t npu_id, npu_port_t 
 
 inline void nas_qos_priority_group::set_buffer_profile(nas_obj_id_t id)
 {
+    if (buffer_profile == id) {
+        return;
+    }
+
     mark_attr_dirty(BASE_QOS_PRIORITY_GROUP_BUFFER_PROFILE_ID);
     buffer_profile = id;
 }

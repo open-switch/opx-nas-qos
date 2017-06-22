@@ -41,11 +41,12 @@
 #include "nas_qos_cps.h"
 #include "nas_qos_queue.h"
 #include "nas_ndi_port.h"
-
+#include "nas_qos_cps_queue.h"
+#include "nas_qos_cps_scheduler_group.h"
 #include <vector>
 
 /* Parse the attributes */
-static cps_api_return_code_t  nas_qos_cps_parse_queue_attr(cps_api_object_t obj,
+static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
                                               nas_qos_queue &queue);
 
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
@@ -55,11 +56,15 @@ static nas_qos_queue * nas_qos_cps_get_queue(uint32_t switch_id,
         nas_qos_queue_key_t key);
 static cps_api_return_code_t nas_qos_cps_api_queue_set(
                                 cps_api_object_t obj,
-                                cps_api_object_t sav_obj);
-t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex);
+                                cps_api_object_list_t sav_obj);
+static cps_api_return_code_t nas_qos_cps_api_queue_create(
+                                cps_api_object_t obj,
+                                cps_api_object_list_t sav_obj);
+static cps_api_return_code_t nas_qos_cps_api_queue_delete(
+                                cps_api_object_t obj,
+                                cps_api_object_list_t sav_obj);
 
 static std_mutex_lock_create_static_init_rec(queue_mutex);
-
 
 
 /**
@@ -78,9 +83,10 @@ cps_api_return_code_t nas_qos_cps_api_queue_write(void * context,
 
     switch (op) {
     case cps_api_oper_CREATE:
+        return nas_qos_cps_api_queue_create(obj, param->prev);
+
     case cps_api_oper_DELETE:
-        // Queue requires no creation or deletion
-        return NAS_QOS_E_UNSUPPORTED;
+        return nas_qos_cps_api_queue_delete(obj, param->prev);
 
     case cps_api_oper_SET:
         return nas_qos_cps_api_queue_set(obj, param->prev);
@@ -151,6 +157,7 @@ static cps_api_return_code_t nas_qos_cps_get_queue_info(
                 &val_queue_number, sizeof(uint32_t));
 
         cps_api_object_attr_add_u64(ret_obj, BASE_QOS_QUEUE_ID, queue->get_queue_id());
+        cps_api_object_attr_add_u64(ret_obj, BASE_QOS_QUEUE_PARENT, queue->get_parent());
 
         // User configured objects
         if (queue->is_wred_id_set())
@@ -211,7 +218,8 @@ cps_api_return_code_t nas_qos_cps_api_queue_read (void * context,
     std_mutex_simple_lock_guard p_m(&queue_mutex);
 
     // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_queue_init(port_id);
+    if (nas_qos_port_hqos_init(port_id) != STD_ERR_OK)
+        return NAS_QOS_E_FAIL;
 
     return nas_qos_cps_get_queue_info(param, switch_id, port_id,
                                 queue_type_specified, queue_type,
@@ -233,19 +241,123 @@ cps_api_return_code_t nas_qos_cps_api_queue_rollback(void * context,
 
     std_mutex_simple_lock_guard p_m(&queue_mutex);
 
+    if (op == cps_api_oper_CREATE) {
+        nas_qos_cps_api_queue_delete(obj, NULL);
+    }
+
     if (op == cps_api_oper_SET) {
         nas_qos_cps_api_queue_set(obj, NULL);
     }
 
-    // create/delete are not allowed for queue, no roll-back is needed
+    if (op == cps_api_oper_DELETE) {
+        nas_qos_cps_api_queue_create(obj, NULL);
+    }
+
 
     return cps_api_ret_code_OK;
 }
 
+static cps_api_return_code_t nas_qos_cps_api_queue_create(
+                                cps_api_object_t obj,
+                                cps_api_object_list_t sav_obj)
+{
+    cps_api_object_attr_t port_id_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_PORT_ID);
+    cps_api_object_attr_t queue_type_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_TYPE);
+    cps_api_object_attr_t queue_num_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_QUEUE_NUMBER);
+    cps_api_object_attr_t parent_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_PARENT);
+
+    if (port_id_attr == NULL ||
+        parent_attr == NULL ||
+        queue_type_attr == NULL || queue_num_attr == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Missing mandatory attribute in the message\n");
+        return NAS_QOS_E_MISSING_KEY;
+    }
+
+    uint32_t switch_id = 0;
+    uint_t port_id = cps_api_object_attr_data_u32(port_id_attr);
+    uint_t queue_type = cps_api_object_attr_data_u32(queue_type_attr);
+    uint_t queue_num = cps_api_object_attr_data_u32(queue_num_attr);
+
+    nas_obj_id_t queue_id = 0;
+
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL)
+        return NAS_QOS_E_FAIL;
+
+    nas_qos_queue_key_t key;
+    key.port_id = port_id;
+    key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
+    key.local_queue_id = queue_num;
+    nas_qos_queue queue(p_switch, key);
+
+    interface_ctrl_t intf_ctrl;
+    if (nas_qos_get_port_intf(port_id, &intf_ctrl) != true) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                     "Cannot find NPU id for ifIndex: %d",
+                      port_id);
+        return NAS_QOS_E_FAIL;
+    }
+    queue.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
+
+   if (nas_qos_cps_parse_attr(obj, queue) != cps_api_ret_code_OK)
+        return NAS_QOS_E_FAIL;
+
+    try {
+        queue_id = p_switch->alloc_queue_id();
+
+        queue.set_queue_id(queue_id);
+
+        queue.commit_create(sav_obj? false: true);
+
+        p_switch->add_queue(queue);
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new queue %u\n",
+                     queue.get_queue_id());
+
+        if (queue.dirty_attr_list().contains(BASE_QOS_QUEUE_PARENT)) {
+            nas_obj_id_t new_parent_id = queue.get_parent();
+            nas_qos_notify_parent_child_change(switch_id, new_parent_id, queue_id, true);
+        }
+
+        // update obj with new queue-id key
+        cps_api_set_key_data(obj, BASE_QOS_QUEUE_ID,
+                cps_api_object_ATTR_T_U64,
+                &queue_id, sizeof(uint64_t));
+
+        // save for rollback if caller requests it.
+        if (sav_obj) {
+            cps_api_object_t tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
+            if (!tmp_obj) {
+                return NAS_QOS_E_FAIL;
+            }
+            cps_api_object_clone(tmp_obj, obj);
+
+        }
+
+    } catch (nas::base_exception e) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                    "NAS QUEUE Create error code: %d ",
+                    e.err_code);
+        if (queue_id)
+            p_switch->release_queue_id(queue_id);
+
+        return NAS_QOS_E_FAIL;
+
+    } catch (...) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                    "NAS QUEUE Create Unexpected error code");
+        if (queue_id)
+            p_switch->release_queue_id(queue_id);
+
+        return NAS_QOS_E_FAIL;
+    }
+
+    return cps_api_ret_code_OK;
+}
 
 static cps_api_return_code_t nas_qos_cps_api_queue_set(
                                 cps_api_object_t obj,
-                                cps_api_object_t sav_obj)
+                                cps_api_object_list_t sav_obj)
 {
     cps_api_object_t tmp_obj;
 
@@ -269,7 +381,8 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
             switch_id, port_id, queue_type, queue_num);
 
     // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_queue_init(port_id);
+    if (nas_qos_port_hqos_init(port_id) != STD_ERR_OK)
+        return NAS_QOS_E_FAIL;
 
     nas_qos_queue_key_t key;
     key.port_id = port_id;
@@ -287,7 +400,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
     nas_qos_queue queue(*queue_p);
 
     cps_api_return_code_t rc = cps_api_ret_code_OK;
-    if ((rc = nas_qos_cps_parse_queue_attr(obj, queue)) != cps_api_ret_code_OK) {
+    if ((rc = nas_qos_cps_parse_attr(obj, queue)) != cps_api_ret_code_OK) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Invalid information in the packet");
         return rc;
     }
@@ -299,6 +412,12 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
 
         nas::attr_set_t modified_attr_list = queue.commit_modify(*queue_p, (sav_obj? false: true));
 
+        if (queue.dirty_attr_list().contains(BASE_QOS_QUEUE_PARENT)) {
+            nas_obj_id_t old_parent_id = queue_p->get_parent();
+            nas_obj_id_t new_parent_id = queue.get_parent();
+            nas_qos_notify_parent_child_change(switch_id, old_parent_id, queue.get_queue_id(), false);
+            nas_qos_notify_parent_child_change(switch_id, new_parent_id, queue.get_queue_id(), true);
+        }
 
         // set attribute with full copy
         // save rollback info if caller requests it.
@@ -330,10 +449,85 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
     return cps_api_ret_code_OK;
 }
 
+static cps_api_return_code_t nas_qos_cps_api_queue_delete(
+                                cps_api_object_t obj,
+                                cps_api_object_list_t sav_obj)
+
+{
+    cps_api_object_attr_t port_id_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_PORT_ID);
+    cps_api_object_attr_t queue_type_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_TYPE);
+    cps_api_object_attr_t queue_num_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_QUEUE_NUMBER);
+
+    if (port_id_attr == NULL ||
+        queue_type_attr == NULL || queue_num_attr == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Key incomplete in the message\n");
+        return NAS_QOS_E_MISSING_KEY;
+    }
+
+    uint32_t switch_id = 0;
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL)
+        return NAS_QOS_E_FAIL;
+
+    uint_t port_id = cps_api_object_attr_data_u32(port_id_attr);
+    uint_t queue_type = cps_api_object_attr_data_u32(queue_type_attr);
+    uint_t queue_num = cps_api_object_attr_data_u32(queue_num_attr);
+
+    nas_qos_queue_key_t key;
+    key.port_id = port_id;
+    key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
+    key.local_queue_id = queue_num;
+    nas_qos_queue * queue_p = nas_qos_cps_get_queue(switch_id, key);
+    if (queue_p == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Queue not found in switch id %u\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting queue %u on switch: %u\n",
+                 queue_p->get_queue_id(), switch_id);
+
+    // delete
+    try {
+        queue_p->commit_delete(sav_obj? false: true);
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted queue %u\n",
+                     queue_p->get_queue_id());
+
+        nas_obj_id_t old_parent_id = queue_p->get_parent();
+        nas_qos_notify_parent_child_change(switch_id, old_parent_id, queue_p->get_queue_id(), false);
+
+        // save current queue config for rollback if caller requests it.
+        // use existing set_mask, existing config
+        if (sav_obj) {
+            cps_api_object_t tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
+            if (!tmp_obj) {
+                return cps_api_ret_code_ERR;
+            }
+            nas_qos_store_prev_attr(tmp_obj, queue_p->set_attr_list(), *queue_p);
+        }
+
+        p_switch->remove_queue(key);
+
+    } catch (nas::base_exception e) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                    "NAS QUEUE Delete error code: %d ",
+                    e.err_code);
+        return NAS_QOS_E_FAIL;
+    } catch (...) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                    "NAS QUEUE Delete: Unexpected error");
+        return NAS_QOS_E_FAIL;
+    }
+
+    return cps_api_ret_code_OK;
+}
+
 
 
 /* Parse the attributes */
-static cps_api_return_code_t  nas_qos_cps_parse_queue_attr(cps_api_object_t obj,
+static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
                                               nas_qos_queue &queue)
 {
     uint64_t val64;
@@ -348,6 +542,11 @@ static cps_api_return_code_t  nas_qos_cps_parse_queue_attr(cps_api_object_t obj,
         case BASE_QOS_QUEUE_QUEUE_NUMBER:
         case BASE_QOS_QUEUE_ID:
             break; // These are not settable attr
+
+        case BASE_QOS_QUEUE_PARENT:
+            val64 = cps_api_object_attr_data_u64(it.attr);
+            queue.set_parent((nas_obj_id_t)val64);
+            break;
 
         case BASE_QOS_QUEUE_WRED_ID:
             val64 = cps_api_object_attr_data_u64(it.attr);
@@ -410,6 +609,11 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
         case BASE_QOS_QUEUE_TYPE:
             break; // These are not settable attr
 
+        case BASE_QOS_QUEUE_PARENT:
+            cps_api_object_attr_add_u64(obj, attr_id,
+                                        queue.get_parent());
+            break;
+
         case BASE_QOS_QUEUE_WRED_ID:
             cps_api_object_attr_add_u64(obj, attr_id,
                                         queue.get_wred_id());
@@ -449,7 +653,8 @@ static nas_qos_queue * nas_qos_cps_get_queue(uint32_t switch_id,
 static t_std_error create_port_queue(hal_ifindex_t port_id,
                                     uint32_t local_queue_id,
                                     BASE_QOS_QUEUE_TYPE_t type,
-                                    ndi_obj_id_t ndi_queue_id)
+                                    ndi_obj_id_t ndi_queue_id,
+                                    nas_obj_id_t & nas_queue_id)
 {
     interface_ctrl_t intf_ctrl;
 
@@ -481,6 +686,10 @@ static t_std_error create_port_queue(hal_ifindex_t port_id,
         q.add_npu(intf_ctrl.npu_id);
         q.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
         q.set_ndi_obj_id(ndi_queue_id);
+
+        // return the newly created nas-obj-id
+        nas_queue_id = queue_id;
+
         q.mark_ndi_created();
 
         EV_LOGGING(QOS, INFO, "QOS",
@@ -499,7 +708,7 @@ static t_std_error create_port_queue(hal_ifindex_t port_id,
 /* This function initializes the queues of a port
  * @Return standard error code
  */
-t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex)
+t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex, parent_map_t & parent_map)
 {
     interface_ctrl_t intf_ctrl;
 
@@ -525,9 +734,9 @@ t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex)
     ndi_port_id.npu_id = intf_ctrl.npu_id;
     ndi_port_id.npu_port = intf_ctrl.port_id;
 
-    /* get the number of queues per port */
-    uint_t no_of_queue = ndi_qos_get_number_of_queues(ndi_port_id);
-    if (no_of_queue == 0) {
+    /* get the max number of queues allowed per port */
+    uint_t max_num_of_queue = ndi_qos_get_number_of_queues(ndi_port_id);
+    if (max_num_of_queue == 0) {
         EV_LOGGING(QOS, INFO, "QOS",
                      "No queues for npu_id %u, npu_port_id %u ",
                      ndi_port_id.npu_id, ndi_port_id.npu_port);
@@ -535,62 +744,68 @@ t_std_error nas_qos_port_queue_init(hal_ifindex_t ifindex)
     }
 
     /* get the list of ndi_queue id list */
-    std::vector<ndi_obj_id_t> ndi_queue_id_list(no_of_queue);
-    if (ndi_qos_get_queue_id_list(ndi_port_id, no_of_queue, &ndi_queue_id_list[0]) !=
-            no_of_queue) {
-        EV_LOGGING(QOS, NOTICE, "QOS",
-                     "Fail to retrieve all queues of npu_id %u, npu_port_id %u ",
-                     ndi_port_id.npu_id, ndi_port_id.npu_port);
-        return NAS_QOS_E_FAIL;
-    }
+    std::vector<ndi_obj_id_t> ndi_queue_id_list(max_num_of_queue);
+    uint_t num_of_queue_retrieved = ndi_qos_get_queue_id_list(ndi_port_id, max_num_of_queue, &ndi_queue_id_list[0]);
 
     /* retrieve the ndi-queue type and assign the queues to with nas_queue_key */
-    ndi_qos_queue_attribute_t ndi_qos_queue_attr;
-    uint_t ucast_queue_id = 0;
-    uint_t mcast_queue_id = 0;
+    ndi_qos_queue_struct_t ndi_qos_queue_info;
     uint_t anycast_queue_id = 0;
 
     uint32_t local_queue_number = 0;
     BASE_QOS_QUEUE_TYPE_t type = BASE_QOS_QUEUE_TYPE_NONE;
 
-    for (uint_t idx = 0; idx < no_of_queue; idx++) {
+    for (uint_t idx = 0; idx < num_of_queue_retrieved; idx++) {
+        memset(&ndi_qos_queue_info, 0, sizeof(ndi_qos_queue_struct_t));
 
-        ndi_qos_get_queue_attribute(ndi_port_id,
-                                    ndi_queue_id_list[idx],
-                                    &ndi_qos_queue_attr);
-
-        if (ndi_qos_queue_attr.type == BASE_QOS_QUEUE_TYPE_UCAST) {
-            local_queue_number = ucast_queue_id;
+        nas_attr_id_t nas_attr_list[] = {
+            BASE_QOS_QUEUE_TYPE,
+            BASE_QOS_QUEUE_QUEUE_NUMBER,
+            BASE_QOS_QUEUE_BUFFER_PROFILE_ID,
+            BASE_QOS_QUEUE_SCHEDULER_PROFILE_ID,
+            BASE_QOS_QUEUE_WRED_ID,
+            BASE_QOS_QUEUE_PARENT,
+        };
+        ndi_qos_get_queue(ndi_port_id.npu_id,
+                          ndi_queue_id_list[idx],
+                          nas_attr_list,
+                          sizeof(nas_attr_list)/sizeof(nas_attr_id_t),
+                          &ndi_qos_queue_info);
+        switch (ndi_qos_queue_info.type) {
+        case BASE_QOS_QUEUE_TYPE_UCAST:
+            local_queue_number = ndi_qos_queue_info.queue_index;
             type = BASE_QOS_QUEUE_TYPE_UCAST;
 
-            ucast_queue_id++;
-        }
-        else if (ndi_qos_queue_attr.type == BASE_QOS_QUEUE_TYPE_MULTICAST) {
-            local_queue_number = mcast_queue_id;
+            break;
+
+        case BASE_QOS_QUEUE_TYPE_MULTICAST:
+            local_queue_number = ndi_qos_queue_info.queue_index;
             type = BASE_QOS_QUEUE_TYPE_MULTICAST;
 
-            mcast_queue_id++;
-        }
-        else if (ndi_qos_queue_attr.type == BASE_QOS_QUEUE_TYPE_NONE) {
+            break;
+
+        case BASE_QOS_QUEUE_TYPE_NONE:
             local_queue_number = anycast_queue_id;
             type = BASE_QOS_QUEUE_TYPE_NONE;
 
             anycast_queue_id++;
-        }
-        else {
+            break;
+
+        default:
             EV_LOGGING(QOS, INFO, "QOS",
-                    "Unknown queue type: %u", ndi_qos_queue_attr.type);
+                    "Unknown queue type: %u", ndi_qos_queue_info.type);
             continue;
         }
 
         // Internally create NAS queue nodes and add to NAS QOS
-        if (create_port_queue(ifindex, local_queue_number, type, ndi_queue_id_list[idx]) != STD_ERR_OK) {
+        nas_obj_id_t nas_queue_id;
+        if (create_port_queue(ifindex, local_queue_number, type, ndi_queue_id_list[idx], nas_queue_id) != STD_ERR_OK) {
             EV_LOGGING(QOS, NOTICE, "QOS",
                          "Not able to create ifindex %u, local_queue_number %u, type %u",
                          ifindex, local_queue_number, type);
             return NAS_QOS_E_FAIL;
         }
 
+        parent_map[nas_queue_id] = ndi_qos_queue_info.parent;
     }
 
     return STD_ERR_OK;
@@ -809,7 +1024,8 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
     std_mutex_simple_lock_guard p_m(&queue_mutex);
 
     // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_queue_init(key.port_id);
+    if (nas_qos_port_hqos_init(key.port_id) != STD_ERR_OK)
+        return NAS_QOS_E_FAIL;
 
     nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
     if (switch_p == NULL) {
@@ -928,7 +1144,8 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
     std_mutex_simple_lock_guard p_m(&queue_mutex);
 
     // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_queue_init(key.port_id);
+    if (nas_qos_port_hqos_init(key.port_id) != STD_ERR_OK)
+        return NAS_QOS_E_FAIL;
 
     nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
     if (switch_p == NULL) {

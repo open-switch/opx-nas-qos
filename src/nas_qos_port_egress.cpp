@@ -74,7 +74,6 @@ bool nas_qos_port_egress::is_leaf_attr (nas_attr_id_t attr_id)
         {BASE_QOS_PORT_EGRESS_NUM_UNICAST_QUEUE,        true},
         {BASE_QOS_PORT_EGRESS_NUM_MULTICAST_QUEUE,      true},
         {BASE_QOS_PORT_EGRESS_NUM_QUEUE,                true},
-        {BASE_QOS_PORT_EGRESS_QUEUE_ID_LIST,            true},
         {BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP,          true},
         {BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP,          true},
         {BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP,           true},
@@ -87,72 +86,6 @@ bool nas_qos_port_egress::is_leaf_attr (nas_attr_id_t attr_id)
     return (_leaf_attr_map.at(static_cast<BASE_QOS_PORT_EGRESS_t>(attr_id)));
 }
 
-ndi_obj_id_t nas_qos_port_egress::nas2ndi_map_id(nas_obj_id_t map_id)
-{
-    if (map_id == 0LL) {
-        //map_id 0 is used to remove map from port
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-    nas_qos_switch& switch_r = get_switch();
-    nas_qos_map* p_map = switch_r.get_map(map_id);
-    if (p_map == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "Map id is not created in ndi yet"};
-    }
-
-    return p_map->ndi_obj_id(ndi_port_id.npu_id);
-}
-
-ndi_obj_id_t nas_qos_port_egress::nas2ndi_wred_profile_id(nas_obj_id_t wred_profile_id)
-{
-    if (wred_profile_id == 0LL) {
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-    nas_qos_switch& switch_r = get_switch();
-    nas_qos_wred* p_wred = switch_r.get_wred(wred_profile_id);
-    if (p_wred == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "WRED pfoile id is not created in ndi yet"};
-    }
-
-    return p_wred->ndi_obj_id(ndi_port_id.npu_id);
-}
-
-ndi_obj_id_t nas_qos_port_egress::nas2ndi_scheduler_profile_id(nas_obj_id_t scheduler_profile_id)
-{
-    if (scheduler_profile_id == 0LL) {
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-    nas_qos_switch& switch_r = get_switch();
-    nas_qos_scheduler* p_sched = switch_r.get_scheduler(scheduler_profile_id);
-    if (p_sched == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "Scheduler pfoile id is not created in ndi yet"};
-    }
-
-    return p_sched->ndi_obj_id(ndi_port_id.npu_id);
-}
-
-ndi_obj_id_t nas_qos_port_egress::nas2ndi_buffer_profile_id(nas_obj_id_t buf_prof_id)
-{
-    if (buf_prof_id == 0LL) {
-        return NDI_QOS_NULL_OBJECT_ID;
-    }
-
-    nas_qos_switch& switch_r = const_cast<nas_qos_switch&>(get_switch());
-    nas_qos_buffer_profile* p_buffer_profile = switch_r.get_buffer_profile(buf_prof_id);
-    if (p_buffer_profile == NULL) {
-        t_std_error rc = STD_ERR(QOS, FAIL, 0);
-        throw nas::base_exception{rc, __PRETTY_FUNCTION__,
-                "buffer_profile id is not created in ndi yet"};
-    }
-
-    return p_buffer_profile->ndi_obj_id(ndi_port_id.npu_id);
-
-}
 
 bool nas_qos_port_egress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
                                                  npu_id_t npu_id)
@@ -163,62 +96,54 @@ bool nas_qos_port_egress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
     EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
                     npu_id, attr_id);
 
-    qos_port_egr_struct_t cfg;
-    memset(&cfg, 0, sizeof(qos_port_egr_struct_t));
+    qos_port_egr_struct_t ndi_cfg;
+    memset(&ndi_cfg, 0, sizeof(qos_port_egr_struct_t));
+    nas_qos_switch & nas_switch = const_cast<nas_qos_switch &>(get_switch());
 
     switch (attr_id) {
     case BASE_QOS_PORT_EGRESS_BUFFER_LIMIT:
-        cfg.buffer_limit = get_buffer_limit();
+        ndi_cfg.buffer_limit = get_buffer_limit();
         break;
     case BASE_QOS_PORT_EGRESS_WRED_PROFILE_ID:
-        cfg.wred_profile_id = nas2ndi_wred_profile_id(get_wred_profile_id());
+        ndi_cfg.wred_profile_id = nas_switch.nas2ndi_wred_profile_id(get_wred_profile_id(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_SCHEDULER_PROFILE_ID:
-        cfg.scheduler_profile_id = nas2ndi_scheduler_profile_id(get_scheduler_profile_id());
+        ndi_cfg.scheduler_profile_id = nas_switch.nas2ndi_scheduler_profile_id(
+                                                    get_scheduler_profile_id(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_NUM_UNICAST_QUEUE:
-        cfg.num_ucast_queue = get_num_unicast_queue();
+        ndi_cfg.num_ucast_queue = get_num_unicast_queue();
         break;
     case BASE_QOS_PORT_EGRESS_NUM_MULTICAST_QUEUE:
-        cfg.num_mcast_queue = get_num_multicast_queue();
+        ndi_cfg.num_mcast_queue = get_num_multicast_queue();
         break;
     case BASE_QOS_PORT_EGRESS_NUM_QUEUE:
-        cfg.num_queue = get_num_queue();
+        ndi_cfg.num_queue = get_num_queue();
         break;
-    case BASE_QOS_PORT_EGRESS_QUEUE_ID_LIST:
-    {
-        uint32_t queue_id_num, id;
-        queue_id_num = get_queue_id_count();
-        for (id = 0; id < queue_id_num; id ++) {
-            _q_id_vec.push_back(get_queue_id(id));
-        }
-        cfg.num_queue_id = _q_id_vec.size();
-        cfg.queue_id_list = &_q_id_vec[0];
-        break;
-    }
     case BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP:
-        cfg.tc_to_queue_map = nas2ndi_map_id(get_tc_to_queue_map());
+        ndi_cfg.tc_to_queue_map = nas_switch.nas2ndi_map_id(get_tc_to_queue_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP:
-        cfg.tc_to_dot1p_map = nas2ndi_map_id(get_tc_to_dot1p_map());
+        ndi_cfg.tc_color_to_dot1p_map = nas_switch.nas2ndi_map_id(get_tc_to_dot1p_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP:
-        cfg.tc_to_dscp_map = nas2ndi_map_id(get_tc_to_dscp_map());
+        ndi_cfg.tc_to_dscp_map = nas_switch.nas2ndi_map_id(get_tc_to_dscp_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DOT1P_MAP:
-        cfg.tc_color_to_dot1p_map = nas2ndi_map_id(get_tc_color_to_dot1p_map());
+        ndi_cfg.tc_color_to_dot1p_map = nas_switch.nas2ndi_map_id(get_tc_color_to_dot1p_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DSCP_MAP:
-        cfg.tc_color_to_dscp_map = nas2ndi_map_id(get_tc_color_to_dscp_map());
+        ndi_cfg.tc_color_to_dscp_map = nas_switch.nas2ndi_map_id(get_tc_color_to_dscp_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP:
-        cfg.pfc_priority_to_queue_map = nas2ndi_map_id(get_pfc_priority_to_queue_map());
+        ndi_cfg.pfc_priority_to_queue_map = nas_switch.nas2ndi_map_id(get_pfc_priority_to_queue_map(), npu_id);
         break;
     case BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST:
-        cfg.num_buffer_profile = get_buffer_profile_id_count();
-        for (uint i = 0; i< cfg.num_buffer_profile; i++)
-            buf_prof_vec.push_back(nas2ndi_buffer_profile_id(_buf_prof_vec[i]));
-        cfg.buffer_profile_list = &buf_prof_vec[0];
+        ndi_cfg.num_buffer_profile = get_buffer_profile_id_count();
+        for (uint i = 0; i< ndi_cfg.num_buffer_profile; i++) {
+            buf_prof_vec.push_back(nas_switch.nas2ndi_buffer_profile_id(_buf_prof_vec[i], npu_id));
+        }
+        ndi_cfg.buffer_profile_list = &buf_prof_vec[0];
         break;
     default:
         STD_ASSERT(0);  //non-modifiable object
@@ -228,7 +153,7 @@ bool nas_qos_port_egress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
     rc = ndi_qos_set_port_egr_profile_attr(ndi_port.npu_id,
                                ndi_port.npu_port,
                                (BASE_QOS_PORT_EGRESS_t)attr_id,
-                               &cfg);
+                               &ndi_cfg);
     if (rc != STD_ERR_OK) {
         throw nas::base_exception {rc, __PRETTY_FUNCTION__,
             "NDI attribute Set Failed"};

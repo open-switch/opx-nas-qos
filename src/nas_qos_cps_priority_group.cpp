@@ -320,7 +320,6 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
 
         case BASE_QOS_PRIORITY_GROUP_BUFFER_PROFILE_ID:
             val = cps_api_object_attr_data_u64(it.attr);
-            priority_group.mark_attr_dirty(id);
             priority_group.set_buffer_profile(val);
             break;
 
@@ -428,7 +427,7 @@ static t_std_error create_port_priority_group(hal_ifindex_t port_id,
         pg.set_ndi_obj_id(ndi_priority_group_id);
         pg.mark_ndi_created();
 
-        EV_LOGGING(QOS, NOTICE, "QOS",
+        EV_LOGGING(QOS, DEBUG, "QOS",
                      "NAS priority_group_id 0x%016lX is allocated for priority_group:"
                      "local_qid %u, ndi_priority_group_id 0x%016lX",
                      priority_group_id, local_id, ndi_priority_group_id);
@@ -535,7 +534,14 @@ static uint64_t get_stats_by_type(const nas_qos_priority_group_stat_counter_t *p
         return (p->current_occupancy_bytes);
     case BASE_QOS_PRIORITY_GROUP_STAT_WATERMARK_BYTES:
         return (p->watermark_bytes);
-
+    case BASE_QOS_PRIORITY_GROUP_STAT_SHARED_CURRENT_OCCUPANCY_BYTES:
+        return (p->shared_current_occupancy_bytes);
+    case BASE_QOS_PRIORITY_GROUP_STAT_SHARED_WATERMARK_BYTES:
+        return (p->shared_watermark_bytes);
+    case BASE_QOS_PRIORITY_GROUP_STAT_XOFF_ROOM_CURRENT_OCCUPANCY_BYTES:
+        return (p->xoff_room_current_occupancy_bytes);
+    case BASE_QOS_PRIORITY_GROUP_STAT_XOFF_ROOM_WATERMARK_BYTES:
+        return (p->xoff_room_watermark_bytes);
     default:
         return 0;
     }

@@ -21,28 +21,31 @@ import nas_qos_buffer_profile_example
 def queue_get_example(port_id, queue_type, queue_number):
     return_data_list = []
 
-    queue_obj = nas_qos.QueueCPSObj(
-        queue_type=queue_type,
-        queue_number=queue_number,
-        port_id=port_id)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': queue_number,
+        'port-id': port_id,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
     ret = cps.get([queue_obj.data()], return_data_list)
 
     if ret:
         print '#### Queue Show ####'
         for cps_ret_data in return_data_list:
-            m = nas_qos.QueueCPSObj(
-                port_id=port_id,
-                queue_type=queue_type,
-                queue_number=queue_number,
-                cps_data=cps_ret_data)
+            m = nas_qos.QueueCPSObj(cps_data=cps_ret_data)
             m.print_obj()
     else:
         print "Error in Get"
 
 
 def queue_modify_wred_example (port_id, queue_type, queue_number, wred_id):
-    m = nas_qos.QueueCPSObj (queue_type=queue_type, queue_number=queue_number, port_id=port_id)
-    m.set_attr ('wred-id', wred_id)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': queue_number,
+        'port-id': port_id,
+        'wred-id': wred_id,
+    }
+    m = nas_qos.QueueCPSObj (map_of_attr=attr_list)
 
     upd = ('set', m.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
@@ -52,7 +55,7 @@ def queue_modify_wred_example (port_id, queue_type, queue_number, wred_id):
         return None
 
     print 'Return = ', ret_cps_data
-    m = nas_qos.QueueCPSObj(None, None, None, cps_data=ret_cps_data[0])
+    m = nas_qos.QueueCPSObj(cps_data=ret_cps_data[0])
     port_id = m.extract_attr('port-id')
     queue_number = m.extract_attr('queue-number')
     print "Successfully modified Queue of Port %d Number %d" % (port_id, queue_number)
@@ -149,9 +152,13 @@ def scheduler_profile_delete_example(sched_id):
 
 def queue_modify_scheduler_example(
         port_id, queue_type, queue_number, sched_id):
-    queue_obj = nas_qos.QueueCPSObj(port_id=port_id, queue_type=queue_type,
-                                    queue_number=queue_number)
-    queue_obj.set_attr('scheduler-profile-id', sched_id)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': queue_number,
+        'port-id': port_id,
+        'scheduler-profile-id': sched_id,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
 
     upd = ('set', queue_obj.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
@@ -161,7 +168,7 @@ def queue_modify_scheduler_example(
         return None
 
     print 'Return = ', ret_cps_data
-    m = nas_qos.QueueCPSObj(None, None, None, cps_data=ret_cps_data[0])
+    m = nas_qos.QueueCPSObj(cps_data=ret_cps_data[0])
     port_id = m.extract_attr('port-id')
     queue_number = m.extract_attr('queue-number')
     print "Successfully modified Queue of Port %d Number %d" % (port_id, queue_number)
@@ -170,9 +177,13 @@ def queue_modify_scheduler_example(
 
 def queue_modify_buffer_profile_example(
         port_id, queue_type, queue_number, buf_prof_id):
-    queue_obj = nas_qos.QueueCPSObj(port_id=port_id, queue_type=queue_type,
-                                    queue_number=queue_number)
-    queue_obj.set_attr('buffer-profile-id', buf_prof_id)
+    attr_list = {
+        'type': queue_type,
+        'queue-number': queue_number,
+        'port-id': port_id,
+        'buffer-profile-id': buf_prof_id,
+    }
+    queue_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
 
     upd = ('set', queue_obj.data())
     ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
@@ -182,13 +193,12 @@ def queue_modify_buffer_profile_example(
         return None
 
     print 'Return = ', ret_cps_data
-    m = nas_qos.QueueCPSObj(None, None, None, cps_data=ret_cps_data[0])
+    m = nas_qos.QueueCPSObj(cps_data=ret_cps_data[0])
     port_id = m.extract_attr('port-id')
     queue_number = m.extract_attr('queue-number')
     print "Successfully modified Queue of Port %d Number %d" % (port_id, queue_number)
 
     return ret_cps_data
-
 
 if __name__ == '__main__':
     port_id = 17
