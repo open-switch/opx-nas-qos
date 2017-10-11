@@ -87,6 +87,7 @@ static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(switch_p->mtx);
     try {
         // create the scheduler-group and add it to switch
         nas_sg_id = switch_p->alloc_scheduler_group_id();
@@ -175,6 +176,7 @@ static t_std_error setup_scheduler_group_hierarchy(npu_id_t npu_id,
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(switch_p->mtx);
     for (auto& it: parent_map) {
         nas_child_id = it.first;
         ndi_parent_id = it.second;
@@ -245,7 +247,7 @@ t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex)
 
     if (nas_qos_port_queue_init(ifindex, parent_map) != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
-                     "Failed to initiate queue for port %lu", ifindex);
+                     "Failed to initialize queue for port %lu", ifindex);
         return NAS_QOS_E_FAIL;
     }
 
@@ -390,6 +392,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
     if (p_switch == NULL)
         return NAS_QOS_E_FAIL;
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     std::vector<nas_qos_scheduler_group *> sg_list;
     if (sg_attr) {
         nas_qos_scheduler_group *scheduler_group = p_switch->get_scheduler_group(scheduler_group_id);
@@ -497,6 +500,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
     if (nas_qos_cps_parse_attr(obj, scheduler_group) != cps_api_ret_code_OK)
         return NAS_QOS_E_FAIL;
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     try {
         scheduler_group_id = p_switch->alloc_scheduler_group_id();
 
@@ -529,7 +533,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
 
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Create error code: %d ",
                     e.err_code);
@@ -568,8 +572,17 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler_group id %u\n",
                     switch_id, scheduler_group_id);
 
-    nas_qos_scheduler_group * scheduler_group_p = nas_qos_cps_get_scheduler_group(switch_id,
-                                                                                  scheduler_group_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                     "switch_id: %u cannot be found/created",
+                     switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_scheduler_group *scheduler_group_p = p_switch->get_scheduler_group(scheduler_group_id);
     if (scheduler_group_p == NULL) {
         return NAS_QOS_E_FAIL;
     }
@@ -630,7 +643,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
         // update the local cache with newly set values
         *scheduler_group_p = scheduler_group;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Attr Modify error code: %d ",
                     e.err_code);
@@ -667,6 +680,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     nas_qos_scheduler_group *scheduler_group_p = p_switch->get_scheduler_group(scheduler_group_id);
     if (scheduler_group_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %u not found\n",
@@ -708,7 +722,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
 
         p_switch->remove_scheduler_group(scheduler_group_p->get_scheduler_group_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Delete error code: %d ",
                     e.err_code);

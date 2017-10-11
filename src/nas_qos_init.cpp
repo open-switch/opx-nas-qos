@@ -23,12 +23,40 @@
 
 #include "event_log.h"
 #include "std_error_codes.h"
-#include "nas_qos_common.h"
-#include "nas_qos_switch_list.h"
 #include "nas_qos_cps.h"
 #include "dell-base-qos.h"
-#include "nas_qos_init.h"
-#include "nas_qos_queue.h"
+#include "dell-base-if.h"
+#include "cps_class_map.h"
+#include "cps_api_events.h"
+#include "nas_qos_switch_list.h"
+#include "cps_api_object_key.h"
+
+
+static bool nas_qos_if_set_handler(
+        cps_api_object_t obj, void *context)
+{
+
+    cps_api_operation_types_t op = cps_api_object_type_operation(cps_api_object_key(obj));
+    if (op != cps_api_oper_DELETE)
+        return true;
+
+    EV_LOGGING(QOS, ERR, "NAS-QOS", "Getting an interface deletion notification...");
+
+    // Only listen to Interface Delete event
+    cps_api_object_attr_t if_index_attr =
+        cps_api_get_key_data(obj, DELL_BASE_IF_CMN_IF_INTERFACES_INTERFACE_IF_INDEX);
+
+    if (if_index_attr == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Interface Deletion message does not have if-index");
+        return true;
+    }
+
+    uint32_t ifidx = cps_api_object_attr_data_u32(if_index_attr);
+
+    nas_qos_if_delete_notify(ifidx);
+
+    return true;
+}
 
 static t_std_error cps_init ()
 {
@@ -56,6 +84,28 @@ static t_std_error cps_init ()
                      0);
 
     if ((cps_rc = cps_api_register(&f)) != cps_api_ret_code_OK) {
+        return STD_ERR(QOS, FAIL, cps_rc);
+    }
+
+    // Register interface creation/deletion event
+    cps_api_event_reg_t reg;
+    cps_api_key_t key;
+
+    memset(&reg, 0, sizeof(cps_api_event_reg_t));
+
+    if (!cps_api_key_from_attr_with_qual(&key,
+            DELL_BASE_IF_CMN_IF_INTERFACES_INTERFACE_OBJ,
+            cps_api_qualifier_OBSERVED)) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "Cannot create a key for interface event");
+        return STD_ERR(QOS, FAIL, 0);
+    }
+
+    reg.objects = &key;
+    reg.number_of_objects = 1;
+
+    if (cps_api_event_thread_reg(&reg, nas_qos_if_set_handler, NULL)
+            != cps_api_ret_code_OK) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "Cannot register interface operation event");
         return STD_ERR(QOS, FAIL, cps_rc);
     }
 

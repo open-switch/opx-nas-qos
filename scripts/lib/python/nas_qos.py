@@ -25,6 +25,7 @@ from nas_qos_buffer_profile import *
 from nas_qos_priority_group import *
 from nas_qos_priority_group_stat import *
 from nas_qos_buffer_pool_stat import *
+from nas_qos_port_pool import *
 
 import ifindex_utils
 import cps_utils

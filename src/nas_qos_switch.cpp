@@ -228,7 +228,24 @@ bool    nas_qos_switch::port_queue_is_initialized(hal_ifindex_t port_id)
     return true;
 }
 
+bool nas_qos_switch::delete_queue_by_ifindex(hal_ifindex_t port_id)
+{
+    //delete all queues of the port
+    queue_iter_t it;
+    for (it = queues.begin(); it != queues.end(); ) {
+        if (it->first.port_id != port_id) {
+            ++it;
+            continue;
+        }
 
+        release_queue_id(it->second.get_queue_id());
+        // erase and advance to next
+        it = queues.erase(it);
+
+        EV_LOGGING(QOS, DEBUG, "QOS", "Queue removed on port %d", port_id);
+    }
+    return true;
+}
 
 /******************* Schedulers *******************/
 
@@ -342,6 +359,25 @@ bool nas_qos_switch::port_sg_is_initialized(hal_ifindex_t port_id)
     return false;
 }
 
+bool nas_qos_switch::delete_sg_by_ifindex(hal_ifindex_t port_id)
+{
+    //delete all SGs of the port
+    scheduler_group_iter_t it;
+    for (it = scheduler_groups.begin(); it != scheduler_groups.end(); ) {
+        if (it->second.get_port_id() != port_id) {
+            ++it;
+            continue;
+        }
+
+        release_scheduler_group_id(it->second.get_scheduler_group_id());
+        // erase and advance to next
+        it = scheduler_groups.erase(it);
+
+        EV_LOGGING(QOS, DEBUG, "QOS", "SG removed on port %d", port_id);
+
+    }
+    return true;
+}
 /***************** Buffer Profile *************************/
 
 nas_qos_buffer_profile * nas_qos_switch::get_buffer_profile(nas_obj_id_t buffer_profile_id)
@@ -533,6 +569,25 @@ bool    nas_qos_switch::port_priority_group_is_initialized(hal_ifindex_t port_id
     return true;
 }
 
+bool nas_qos_switch::delete_pg_by_ifindex(hal_ifindex_t port_id)
+{
+    //delete all PG of the port
+    priority_group_iter_t it;
+    for (it = priority_groups.begin(); it != priority_groups.end(); ) {
+        if (it->first.port_id != port_id) {
+            ++it;
+            continue;
+        }
+
+        release_priority_group_id(it->second.get_priority_group_id());
+        // erase and advance to next
+        it = priority_groups.erase(it);
+
+        EV_LOGGING(QOS, DEBUG, "QOS", "PG removed on port %d", port_id);
+
+    }
+    return true;
+}
 
 
 /***************** Maps *************************/
@@ -653,6 +708,44 @@ bool nas_qos_switch::port_egr_is_initialized(hal_ifindex_t port_id)
 {
     port_egr_iter_t it = port_egrs.find(port_id);
     return (it != port_egrs.end());
+}
+
+/***************** Port Pool *************************/
+
+nas_qos_port_pool* nas_qos_switch::get_port_pool(hal_ifindex_t ifindex, nas_obj_id_t pool_id)
+{
+    nas_qos_port_pool_key_t key;
+    key.port_id = ifindex;
+    key.pool_id = pool_id;
+    port_pool_iter_t pi = port_pools.find(key);
+    return (pi != port_pools.end() ? &((*pi).second) : NULL);
+}
+
+t_std_error nas_qos_switch::add_port_pool(nas_qos_port_pool& p)
+{
+    if (get_port_pool(p.get_port_id(), p.get_pool_id()) != NULL) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
+                "Port pool for port %d alreay exists\n",
+                p.get_port_id());
+        throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__,
+                "port pool Exists"};
+    }
+
+    nas_qos_port_pool_key_t key;
+    key.port_id = p.get_port_id();
+    key.pool_id = p.get_pool_id();
+
+    port_pools.insert(std::make_pair(key, std::move(p)));
+
+    return STD_ERR_OK;
+}
+
+void nas_qos_switch::remove_port_pool(hal_ifindex_t ifindex, nas_obj_id_t pool_id)
+{
+    nas_qos_port_pool_key_t key;
+    key.port_id = ifindex;
+    key.pool_id = pool_id;
+    port_pools.erase(key);
 }
 
 ndi_obj_id_t nas_qos_switch::nas2ndi_scheduler_profile_id(nas_obj_id_t id, npu_id_t npu_id)

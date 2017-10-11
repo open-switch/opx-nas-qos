@@ -44,6 +44,7 @@
 #include "nas_qos_cps_buffer_pool.h"
 #include "nas_qos_cps_buffer_profile.h"
 #include "nas_qos_cps_priority_group.h"
+#include "nas_qos_cps_port_pool.h"
 
 /**
  * This function provides NAS-QoS CPS API read function
@@ -132,6 +133,13 @@ cps_api_return_code_t nas_qos_cps_api_read (void * context,
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PRIORITY_GROUP_STAT_OBJ");
         return nas_qos_cps_api_priority_group_stat_read(context, param, ix);
 
+    case BASE_QOS_PORT_POOL_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_OBJ");
+        return nas_qos_cps_api_port_pool_read(context, param, ix);
+
+    case BASE_QOS_PORT_POOL_STAT_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_STAT_OBJ");
+        return nas_qos_cps_api_port_pool_stat_read(context, param, ix);
 
     default:
         EV_LOGGING(QOS, NOTICE, "QOS", "Unknown QoS subcat");
@@ -226,6 +234,13 @@ cps_api_return_code_t nas_qos_cps_api_write (void * context,
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PRIORITY_GROUP_STAT_OBJ");
         return nas_qos_cps_api_priority_group_stat_clear(context, param, ix);
 
+    case BASE_QOS_PORT_POOL_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_OBJ");
+        return nas_qos_cps_api_port_pool_write(context, param, ix);
+
+    case BASE_QOS_PORT_POOL_STAT_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_STAT_OBJ");
+        return nas_qos_cps_api_port_pool_stat_clear(context, param, ix);
     default:
         return NAS_QOS_E_UNSUPPORTED;
 
@@ -316,6 +331,14 @@ cps_api_return_code_t nas_qos_cps_api_rollback (void * context,
 
     case BASE_QOS_PRIORITY_GROUP_STAT_OBJ:
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PRIORITY_GROUP_STAT_OBJ");
+        return NAS_QOS_E_UNSUPPORTED;
+
+    case BASE_QOS_PORT_POOL_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_OBJ");
+        return nas_qos_cps_api_port_pool_rollback(context, param, ix);
+
+    case BASE_QOS_PORT_POOL_STAT_OBJ:
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_STAT_OBJ");
         return NAS_QOS_E_UNSUPPORTED;
 
     default:

@@ -180,6 +180,7 @@ static cps_api_return_code_t _append_one_wred(cps_api_get_params_t * param,
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY, wred->get_r_drop_prob());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_WEIGHT, wred->get_weight());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE, wred->get_ecn_enable());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_MARK, wred->get_ecn_mark());
 
     // add the list of NPUs
     for (auto npu_id: wred->npu_list()) {
@@ -262,7 +263,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Create error code: %d ",
                     e.err_code);
@@ -335,7 +336,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_set(
         // update the local cache with newly set values
         *wred_p = wred;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Attr Modify error code: %d ",
                     e.err_code);
@@ -401,7 +402,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_delete(
 
         p_switch->remove_wred(wred_p->get_wred_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Delete error code: %d ",
                     e.err_code);
@@ -536,6 +537,11 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             wred.set_ecn_enable(val);
             break;
 
+        case BASE_QOS_WRED_PROFILE_ECN_MARK:
+            val = cps_api_object_attr_data_u32(it.attr);
+            wred.mark_attr_dirty(id);
+            wred.set_ecn_mark((BASE_QOS_ECN_MARK_MODE_t)val);
+            break;
         case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:
             npu_id = cps_api_object_attr_data_u32(it.attr);
             wred.add_npu(npu_id);
@@ -649,6 +655,11 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
         case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
             cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE,
                     wred.get_ecn_enable());
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_MARK:
+            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_MARK,
+                    wred.get_ecn_mark());
             break;
 
         case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:

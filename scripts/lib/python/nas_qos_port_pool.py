@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2015 Dell Inc.
+# Copyright (c) 2017 Dell Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,23 +12,16 @@
 #
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
-import cps_utils
-import cps
 import nas_qos_utils as utl
-import bytearray_utils as ba_utils
 
 
-class BufferPoolCPSObj:
+class PortPoolCPSObj:
 
-    yang_name = 'buffer-pool'
+    yang_name = 'port-pool'
 
     type_map = {
-        'id': ('leaf', 'uint64_t'),
-        'shared-size': ('leaf', 'uint32_t'),
-        'pool-type': ('leaf', 'enum', 'base-qos:buffer-pool-type:'),
-        'size': ('leaf', 'uint32_t'),
-        'threshold-mode': ('leaf', 'enum', 'base-qos:buffer-threshold-mode:'),
-        'xoff-size': ('leaf', 'uint32_t'),
+        'port-id': ('leaf', 'uint32_t'),
+        'buffer-pool-id': ('leaf', 'uint64_t'),
         'wred-profile-id': ('leaf', 'uint64_t'),
     }
 
@@ -36,16 +29,13 @@ class BufferPoolCPSObj:
     def get_type_map(cls):
         return cls.type_map
 
-    def __init__(self, buffer_pool_id=None, cps_data=None,
-                 map_of_attr={}):
+    def __init__(self, cps_data=None, map_of_attr={}):
         if cps_data is not None:
             self.cps_data = cps_data
             return
 
         self.cps_obj_wr = utl.CPSObjWrp(self.yang_name, self.get_type_map())
         self.cps_data = self.cps_obj_wr.get()
-        if buffer_pool_id is not None:
-            self.set_attr('id', buffer_pool_id)
         for key in map_of_attr:
             self.set_attr(key, map_of_attr[key])
 

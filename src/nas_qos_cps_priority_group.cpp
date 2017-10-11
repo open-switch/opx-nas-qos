@@ -49,8 +49,6 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                         const nas::attr_set_t attr_set,
                                         const nas_qos_priority_group &priority_group);
-static nas_qos_priority_group * nas_qos_cps_get_priority_group(uint_t switch_id,
-                        nas_qos_priority_group_key_t key);
 static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
                                 cps_api_object_t obj,
                                 cps_api_object_t sav_obj);
@@ -104,6 +102,7 @@ static cps_api_return_code_t nas_qos_cps_get_priority_group_info(
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     std::vector<nas_qos_priority_group *> pg_list(count);
     p_switch->get_port_priority_groups(port_id, count, &pg_list[0]);
 
@@ -246,7 +245,17 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
     nas_qos_priority_group_key_t key;
     key.port_id = port_id;
     key.local_id = local_id;
-    nas_qos_priority_group * priority_group_p = nas_qos_cps_get_priority_group(switch_id, key);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_priority_group * priority_group_p = p_switch->get_priority_group(key);
     if (priority_group_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                         "priority_group not found in switch id %u\n",
@@ -287,7 +296,7 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
         // update the local cache with newly set values
         *priority_group_p = priority_group;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS priority_group Attr Modify error code: %d ",
                     e.err_code);
@@ -378,18 +387,6 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-static nas_qos_priority_group * nas_qos_cps_get_priority_group(uint_t switch_id,
-                                           nas_qos_priority_group_key_t key)
-{
-
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL)
-        return NULL;
-
-    nas_qos_priority_group *priority_group_p = p_switch->get_priority_group(key);
-
-    return priority_group_p;
-}
 
 // create per-port, per-priority_group instance
 static t_std_error create_port_priority_group(hal_ifindex_t port_id,
@@ -412,6 +409,7 @@ static t_std_error create_port_priority_group(hal_ifindex_t port_id,
                      port_id);
         return NAS_QOS_E_FAIL;
     }
+    std::lock_guard<std::recursive_mutex> switch_lg(switch_p->mtx);
 
     try {
         // create the priority_group and add the priority_group to switch

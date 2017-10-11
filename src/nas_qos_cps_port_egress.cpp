@@ -130,17 +130,6 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-static nas_qos_port_egress* nas_qos_get_port_egress(uint_t switch_id,
-                                                hal_ifindex_t port_id)
-{
-    nas_qos_switch* p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                "Switch not found, id=%d\n", switch_id);
-        return NULL;
-    }
-    return p_switch->get_port_egress(port_id);
-}
 
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                     const nas::attr_set_t& attr_set,
@@ -298,6 +287,7 @@ static t_std_error create_port_egr_profile(uint_t switch_id,
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     try {
         nas_qos_port_egress port_eg(p_switch, port_id);
         port_eg.set_buffer_limit(p.buffer_limit);
@@ -354,7 +344,7 @@ t_std_error nas_qos_port_egress_init(uint_t switch_id,
     if (create_port_egr_profile(switch_id, ifindex) !=
             STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
-                "Failed to create port egress profle: %u\n", ifindex);
+                "Failed to create port egress profile: %u\n", ifindex);
         return NAS_QOS_E_FAIL;
     }
 
@@ -400,7 +390,17 @@ static cps_api_return_code_t nas_qos_cps_api_port_eg_set(
 
     nas_qos_port_egress_init(switch_id, port_id);
 
-    nas_qos_port_egress* port_eg_p = nas_qos_get_port_egress(switch_id, port_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_port_egress* port_eg_p = p_switch->get_port_egress(port_id);
     if (port_eg_p == NULL) {
         return NAS_QOS_E_FAIL;
     }
@@ -439,7 +439,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_eg_set(
         // update the local cache with newly set values
         *port_eg_p = port_eg;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS PORT EGRESS Attr Modify error code: %d ",
                     e.err_code);
@@ -516,7 +516,17 @@ cps_api_return_code_t nas_qos_cps_api_port_egress_read(void * context,
 
     nas_qos_port_egress_init(switch_id, port_id);
 
-    nas_qos_port_egress *port_eg = nas_qos_get_port_egress(switch_id, port_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_port_egress *port_eg = p_switch->get_port_egress(port_id);
     if (port_eg == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Failed to get port egress object, port_id=%d\n",
                    port_id);

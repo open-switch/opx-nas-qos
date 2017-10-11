@@ -84,6 +84,7 @@ bool nas_qos_buffer_profile::push_create_obj_to_npu (npu_id_t npu_id,
     cfg.shared_static_th = bp->cfg.shared_static_th;
     cfg.xoff_th = bp->cfg.xoff_th;
     cfg.xon_th = bp->cfg.xon_th;
+    cfg.xon_offset_th = bp->cfg.xon_offset_th;
 
     if ((rc = ndi_qos_create_buffer_profile (npu_id,
                                    &attr_list[0],
@@ -137,6 +138,7 @@ bool nas_qos_buffer_profile::is_leaf_attr (nas_attr_id_t attr_id)
         {BASE_QOS_BUFFER_PROFILE_SHARED_STATIC_THRESHOLD, true},
         {BASE_QOS_BUFFER_PROFILE_XOFF_THRESHOLD, true},
         {BASE_QOS_BUFFER_PROFILE_XON_THRESHOLD, true},
+        {BASE_QOS_BUFFER_PROFILE_XON_OFFSET_THRESHOLD, true},
         {BASE_QOS_BUFFER_PROFILE_NAME, true},
 
         //The NPU ID list attribute is handled by the base object itself.
@@ -183,6 +185,10 @@ bool nas_qos_buffer_profile::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 
     case BASE_QOS_BUFFER_PROFILE_XON_THRESHOLD:
         cfg.xon_th = get_xon_th();
+        break;
+
+    case BASE_QOS_BUFFER_PROFILE_XON_OFFSET_THRESHOLD:
+        cfg.xon_offset_th = get_xon_offset_th();
         break;
 
     case BASE_QOS_BUFFER_PROFILE_NAME:

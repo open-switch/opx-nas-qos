@@ -52,8 +52,6 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                 const nas::attr_set_t attr_set,
                                                 const nas_qos_queue &queue);
-static nas_qos_queue * nas_qos_cps_get_queue(uint32_t switch_id,
-        nas_qos_queue_key_t key);
 static cps_api_return_code_t nas_qos_cps_api_queue_set(
                                 cps_api_object_t obj,
                                 cps_api_object_list_t sav_obj);
@@ -117,6 +115,7 @@ static cps_api_return_code_t nas_qos_cps_get_queue_info(
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     std::vector<nas_qos_queue *> q_list(count);
     p_switch->get_port_queues(port_id, count, &q_list[0]);
 
@@ -302,6 +301,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_create(
    if (nas_qos_cps_parse_attr(obj, queue) != cps_api_ret_code_OK)
         return NAS_QOS_E_FAIL;
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     try {
         queue_id = p_switch->alloc_queue_id();
 
@@ -334,7 +334,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_create(
 
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS QUEUE Create error code: %d ",
                     e.err_code);
@@ -388,7 +388,17 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
     key.port_id = port_id;
     key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
     key.local_queue_id = queue_num;
-    nas_qos_queue * queue_p = nas_qos_cps_get_queue(switch_id, key);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_queue *queue_p = p_switch->get_queue(key);
     if (queue_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                         "Queue not found in switch id %u\n",
@@ -433,7 +443,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
         // update the local cache with newly set values
         *queue_p = queue;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS queue Attr Modify error code: %d ",
                     e.err_code);
@@ -477,7 +487,9 @@ static cps_api_return_code_t nas_qos_cps_api_queue_delete(
     key.port_id = port_id;
     key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
     key.local_queue_id = queue_num;
-    nas_qos_queue * queue_p = nas_qos_cps_get_queue(switch_id, key);
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_queue * queue_p = p_switch->get_queue(key);
     if (queue_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                         "Queue not found in switch id %u\n",
@@ -510,7 +522,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_delete(
 
         p_switch->remove_queue(key);
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS QUEUE Delete error code: %d ",
                     e.err_code);
@@ -637,17 +649,6 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-static nas_qos_queue * nas_qos_cps_get_queue(uint32_t switch_id,
-        nas_qos_queue_key_t key)
-{
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL)
-        return NULL;
-
-    nas_qos_queue *queue_p = p_switch->get_queue(key);
-
-    return queue_p;
-}
 
 // create per-port, per-queue instance
 static t_std_error create_port_queue(hal_ifindex_t port_id,
@@ -673,6 +674,7 @@ static t_std_error create_port_queue(hal_ifindex_t port_id,
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(switch_p->mtx);
     try {
         // create the queue and add the queue to switch
         nas_obj_id_t queue_id = switch_p->alloc_queue_id();
@@ -917,8 +919,12 @@ typedef struct _stat_attr_list_t {
     _stat_get_fn    fn;
 }_stat_attr_list;
 
-static const  std::unordered_map<nas_attr_id_t, _stat_attr_list, std::hash<int>>
-    _queue_stat_attr_map = {
+static bool _queue_stat_attr_get(nas_attr_id_t attr_id, _stat_attr_list * p_stat_attr)
+{
+
+    static const auto &  _queue_stat_attr_map =
+            * new std::unordered_map<nas_attr_id_t, _stat_attr_list, std::hash<int>>
+    {
         {BASE_QOS_QUEUE_STAT_PACKETS,
                 {true, true, _get_packets}},
         {BASE_QOS_QUEUE_STAT_BYTES,
@@ -977,15 +983,22 @@ static const  std::unordered_map<nas_attr_id_t, _stat_attr_list, std::hash<int>>
                 {true, true, _get_shared_watermark_bytes}},
        };
 
+    try {
+        *p_stat_attr = _queue_stat_attr_map.at(attr_id);
+    }
+    catch (...) {
+        return false;
+    }
+    return true;
+}
 
 static uint64_t get_stats_by_type(const nas_qos_queue_stat_counter_t *p,
                                 BASE_QOS_QUEUE_STAT_t id)
 {
-    try {
-        return _queue_stat_attr_map.at(id).fn(p);
-    } catch (std::out_of_range e) {
+    _stat_attr_list stat_attr;
+    if (_queue_stat_attr_get(id, &stat_attr) != true)
         return 0;
-    }
+    return stat_attr.fn(p);
 }
 
 
@@ -1052,13 +1065,15 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
             id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER)
             continue; //key
 
-        try {
-            if (_queue_stat_attr_map.at(id).read_ok) {
+        _stat_attr_list stat_attr;
+        if (_queue_stat_attr_get(id, &stat_attr) != true) {
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %u, ignored", id);
+            continue;
+        }
+
+        if (stat_attr.read_ok) {
                 counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
             }
-        } catch (std::out_of_range e) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %u, ignored", id);
-        }
     }
 
     if (ndi_qos_get_queue_stats(queue_p->get_ndi_port_id(),
@@ -1171,12 +1186,14 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
             id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER)
             continue; //key
 
-        try {
-            if (_queue_stat_attr_map.at(id).write_ok) {
-                counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
-            }
-        } catch (std::out_of_range e) {
+        _stat_attr_list stat_attr;
+        if (_queue_stat_attr_get(id, &stat_attr) != true) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %u, ignored", id);
+            continue;
+        }
+
+        if (stat_attr.write_ok) {
+                counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
         }
     }
 

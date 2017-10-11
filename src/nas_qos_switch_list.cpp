@@ -28,10 +28,10 @@
 #include "nas_switch.h"
 #include "nas_ndi_switch.h"
 
-typedef std::unordered_map<uint_t, nas_qos_switch>  switch_list_t;
+typedef std::unordered_map<uint_t, nas_qos_switch *>  switch_list_t;
 typedef switch_list_t::iterator switch_iter_t;
 
-static switch_list_t nas_qos_switch_list_cache;
+static auto & nas_qos_switch_list_cache = *new switch_list_t;
 
 
 /**
@@ -43,14 +43,14 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
 {
     try {
         /* get from our cache first */
-        return &(nas_qos_switch_list_cache.at(switch_id));
+        return nas_qos_switch_list_cache.at(switch_id);
 
-    } catch (std::out_of_range) {
+    } catch (std::out_of_range&) {
 
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                      "Creating Switch id %d from inventory", switch_id);
 
-        nas_qos_switch nas_qos_sw(switch_id);
+        nas_qos_switch * p_switch = new nas_qos_switch(switch_id);
 
         // Search the switch information from the config file
         const nas_switch_detail_t* sw =  nas_switch (switch_id);
@@ -61,24 +61,28 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
         }
 
         for (size_t count = 0; count < sw->number_of_npus; count++)
-            nas_qos_sw.add_npu (sw->npus[count]);
+            p_switch->add_npu (sw->npus[count]);
 
         /* init switch-wide queue info using one of the npu ids */
         if (sw->number_of_npus > 0) {
             if (ndi_switch_get_queue_numbers(sw->npus[0],
-                    &nas_qos_sw.ucast_queues_per_port, &nas_qos_sw.mcast_queues_per_port,
-                    &nas_qos_sw.total_queues_per_port, &nas_qos_sw.cpu_queues)
+                    &(p_switch->ucast_queues_per_port), &(p_switch->mcast_queues_per_port),
+                    &(p_switch->total_queues_per_port), &(p_switch->cpu_queues))
                     != STD_ERR_OK) {
                 EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Failed to get global queue info for switch id %d",
                         switch_id);
+                delete p_switch;
                 return NULL;
             }
         }
 
-        if (nas_qos_add_switch(switch_id, nas_qos_sw) != STD_ERR_OK)
+        if (nas_qos_add_switch(switch_id, p_switch) != STD_ERR_OK) {
+            delete p_switch;
             return NULL;
-        else
-            return &(nas_qos_switch_list_cache.at(switch_id));
+        }
+        else {
+            return nas_qos_switch_list_cache.at(switch_id);
+        }
     }
 
     return NULL;
@@ -90,11 +94,11 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
  * @Param QoS switch instance
  * @return standard error code
  */
-t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch& s)
+t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch* s)
 {
     /* Do NOT allow overwrite of existing entry */
     switch_iter_t si = nas_qos_switch_list_cache.find(switch_id);
-    nas_qos_switch *p = ((si != nas_qos_switch_list_cache.end())? &(si->second): NULL);
+    nas_qos_switch *p = ((si != nas_qos_switch_list_cache.end())? (si->second): NULL);
 
     if (p) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Switch id %d exists already", switch_id);
@@ -103,7 +107,7 @@ t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch& s)
 
     // insert
     try {
-        nas_qos_switch_list_cache.insert(std::make_pair(switch_id, std::move(s)));
+        nas_qos_switch_list_cache.insert(std::make_pair(switch_id, s));
     }
     catch (...) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Failed to insert a new switch id %u", switch_id);
@@ -169,5 +173,47 @@ bool nas_qos_get_port_intf(uint_t ifindex, interface_ctrl_t *intf_ctrl)
     }
 
     return true;
+}
+
+/*
+ *  This function cleans up interface-related data structure
+ *  within NAS-QoS.
+ *  Note: This clean up work does not go further down to SAI level.
+ *  SAI automatically cleans up its own QoS-related data structure
+ *  upon receiving "interface-deletion" message from NAS-Interface.
+ *
+ *  @Param ifindex
+ *  @return
+ *
+ */
+void nas_qos_if_delete_notify(uint_t ifindex)
+{
+
+    EV_LOGGING(QOS, WARNING, "QOS", "ifindex: %d is being deleted", ifindex);
+
+    nas_qos_switch * p_switch = nas_qos_get_switch(0);
+
+    if (p_switch == NULL)
+        return;
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    // delete Queues
+    p_switch->delete_queue_by_ifindex(ifindex);
+
+    // delete SGs
+    p_switch->delete_sg_by_ifindex(ifindex);
+
+    // delete Port-Ingress node
+    p_switch->remove_port_ingress(ifindex);
+
+    // delete Port-Egress node
+    p_switch->remove_port_egress(ifindex);
+
+    // delete PG
+    p_switch->delete_pg_by_ifindex(ifindex);
+
+
+    return;
 }
 

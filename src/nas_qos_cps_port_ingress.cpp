@@ -153,17 +153,6 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-static nas_qos_port_ingress* nas_qos_get_port_ingress(uint_t switch_id,
-                                                hal_ifindex_t port_id)
-{
-    nas_qos_switch* p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                "Switch not found, id=%d\n", switch_id);
-        return NULL;
-    }
-    return p_switch->get_port_ingress(port_id);
-}
 
 
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
@@ -335,6 +324,7 @@ static t_std_error create_port_ing_profile(uint_t switch_id,
         return NAS_QOS_E_FAIL;
     }
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     try {
         nas_qos_port_ingress port_ing(p_switch, port_id);
         port_ing.set_default_traffic_class(p.default_tc);
@@ -400,7 +390,7 @@ t_std_error nas_qos_port_ingress_init(uint_t switch_id,
     if ((rc = create_port_ing_profile(switch_id, ifindex)) !=
             STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                "Failed to create port ingress profle: %u\n", ifindex);
+                "Failed to create port ingress profile: %u\n", ifindex);
         return rc;
     }
 
@@ -446,7 +436,17 @@ static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
 
     nas_qos_port_ingress_init(switch_id, port_id);
 
-    nas_qos_port_ingress* port_ing_p = nas_qos_get_port_ingress(switch_id, port_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_port_ingress* port_ing_p = p_switch->get_port_ingress(port_id);
     if (port_ing_p == NULL) {
         EV_LOGGING(QOS, INFO, "NAS-QOS",
                 "Could not find port ingress object for switch %d port %d\n",
@@ -488,7 +488,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
         // update the local cache with newly set values
         *port_ing_p = port_ing;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                     "NAS PORT INGRESS Attr Modify error code: %d ",
                     e.err_code);
@@ -566,7 +566,17 @@ cps_api_return_code_t nas_qos_cps_api_port_ingress_read(void * context,
 
     nas_qos_port_ingress_init(switch_id, port_id);
 
-    nas_qos_port_ingress *port_ing = nas_qos_get_port_ingress(switch_id, port_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                        "Switch %u not found\n",
+                        switch_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    nas_qos_port_ingress *port_ing = p_switch->get_port_ingress(port_id);
     if (port_ing == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Failed to get port ingress object, port_id=%d\n",
                    port_id);

@@ -68,6 +68,8 @@ public:
     uint32_t    get_size() const {return cfg.size;}
     void        set_size(uint32_t size) {cfg.size = size;}
 
+    uint32_t    get_xoff_size() const {return cfg.xoff_size;}
+    void        set_xoff_size(uint32_t size) {cfg.xoff_size = size;}
     BASE_QOS_BUFFER_POOL_TYPE_t get_type() const {return cfg.type;}
     void  set_type(BASE_QOS_BUFFER_POOL_TYPE_t type) {cfg.type = type;}
 
@@ -75,6 +77,8 @@ public:
     void  set_threshold_mode(BASE_QOS_BUFFER_THRESHOLD_MODE_t mode) {
         cfg.threshold_mode = mode;
     }
+    ndi_obj_id_t get_wred_profile_id() const { return cfg.wred_profile_id; }
+    void set_wred_profile_id(ndi_obj_id_t profile_id) { cfg.wred_profile_id = profile_id; }
 
     /// Overriding base object virtual functions
     virtual const char* name () const override { return "QOS buffer_pool";}

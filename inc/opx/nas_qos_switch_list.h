@@ -41,7 +41,7 @@ nas_qos_switch* nas_qos_get_switch (uint_t switch_id);
  * @Param QoS switch instance
  * @return standard error code
  */
-t_std_error    nas_qos_add_switch (uint_t switch_id, nas_qos_switch& switch_instance);
+t_std_error    nas_qos_add_switch (uint_t switch_id, nas_qos_switch* switch_instance);
 
 /**
  * This function removes a switch instance from QoS switch list
@@ -63,5 +63,12 @@ nas_qos_switch * nas_qos_get_switch_by_npu(npu_id_t npu_id);
  * @Return True if the interface structure is properly filled; False otherwise
  */
 bool nas_qos_get_port_intf(uint_t ifindex, interface_ctrl_t *intf_ctrl);
+/*
+ *  This function cleans up an interface related data structure
+ *  @Param ifindex
+ *  @return
+ *
+ */
+void nas_qos_if_delete_notify(uint_t ifindex);
 
 #endif

@@ -31,6 +31,7 @@ class BufferProfileCPSObj:
         'shared-static-threshold': ('leaf', 'uint32_t'),
         'xoff-threshold': ('leaf', 'uint32_t'),
         'xon-threshold': ('leaf', 'uint32_t'),
+        'xon-offset-threshold': ('leaf', 'uint32_t'),
         'name': ('leaf', 'string'),
     }
 

@@ -49,19 +49,6 @@ void nas_qos_map_entry::commit_create (bool rolling_back)
 
 {
     switch (type) {
-    case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
-        if (!is_attr_dirty (BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_TC)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute TC not present"};
-        }
-
-        if (!is_attr_dirty (BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_COLOR)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute COLOR not present"};
-        }
-        break;
 
     case NDI_QOS_MAP_DOT1P_TO_TC:
         if (!is_attr_dirty (BASE_QOS_DOT1P_TO_TC_MAP_ENTRY_TC)) {
@@ -79,19 +66,6 @@ void nas_qos_map_entry::commit_create (bool rolling_back)
         }
         break;
 
-    case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
-        if (!is_attr_dirty (BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_TC)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute TC not present"};
-        }
-
-        if (!is_attr_dirty (BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_COLOR)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute COLOR not present"};
-        }
-        break;
 
     case NDI_QOS_MAP_DSCP_TO_TC:
         if (!is_attr_dirty (BASE_QOS_DSCP_TO_TC_MAP_ENTRY_TC)) {
@@ -106,22 +80,6 @@ void nas_qos_map_entry::commit_create (bool rolling_back)
             throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
                             __PRETTY_FUNCTION__,
                             "Mandatory attribute COLOR not present"};
-        }
-        break;
-
-    case NDI_QOS_MAP_TC_TO_DOT1P:
-        if (!is_attr_dirty (BASE_QOS_TC_TO_DOT1P_MAP_ENTRY_DOT1P)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute Dot1p not present"};
-        }
-        break;
-
-    case NDI_QOS_MAP_TC_TO_DSCP:
-        if (!is_attr_dirty (BASE_QOS_TC_TO_DSCP_MAP_ENTRY_DSCP)) {
-            throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
-                            __PRETTY_FUNCTION__,
-                            "Mandatory attribute DSCP not present"};
         }
         break;
 

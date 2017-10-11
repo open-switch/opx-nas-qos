@@ -39,6 +39,7 @@ class WredCPSObj:
         'red-drop-probability': ('leaf', 'uint32_t'),
         'weight': ('leaf', 'uint32_t'),
         'ecn-enable': ('leaf', 'uint32_t'),
+        'ecn-mark': ('leaf', 'enum', 'base-qos:ecn-mark-mode:'),
         'npu-id-list': ('leaf', 'uint32_t'),
     }
 

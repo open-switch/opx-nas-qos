@@ -187,27 +187,6 @@ static const
                      NULL,
                     }
                 },
-                {NDI_QOS_MAP_DOT1P_TO_TC_COLOR,
-                    {BASE_QOS_DOT1P_TO_TC_COLOR_MAP_OBJ,
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY,
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ID,
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_NAME,
-                     //keys
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_DOT1P,
-                     cps_api_object_ATTR_T_BIN,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-
-                     //attr
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_TC,
-                     cps_api_object_ATTR_T_BIN,
-                     _attr_parse_tc_fn,
-                     _attr_get_tc_fn,
-                     BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_COLOR,
-                     cps_api_object_ATTR_T_U32,
-                     _attr_parse_color_fn,
-                     _attr_get_color_fn,
-                    }
-                },
                 {NDI_QOS_MAP_DSCP_TO_TC,
                     {BASE_QOS_DSCP_TO_TC_MAP_OBJ,
                      BASE_QOS_DSCP_TO_TC_MAP_ENTRY,
@@ -243,67 +222,6 @@ static const
                      cps_api_object_ATTR_T_U32,
                      _attr_parse_color_fn,
                      _attr_get_color_fn,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-                     NULL,
-                     NULL,
-                    }
-                },
-                {NDI_QOS_MAP_DSCP_TO_TC_COLOR,
-                    {BASE_QOS_DSCP_TO_TC_COLOR_MAP_OBJ,
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY,
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_ID,
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_NAME,
-                     //keys
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_DSCP,
-                     cps_api_object_ATTR_T_BIN,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-
-                     //attr
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_TC,
-                     cps_api_object_ATTR_T_BIN,
-                     _attr_parse_tc_fn,
-                     _attr_get_tc_fn,
-                     BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_COLOR,
-                     cps_api_object_ATTR_T_U32,
-                     _attr_parse_color_fn,
-                     _attr_get_color_fn,
-                    }
-                },
-                {NDI_QOS_MAP_TC_TO_DOT1P,
-                    {BASE_QOS_TC_TO_DOT1P_MAP_OBJ,
-                     BASE_QOS_TC_TO_DOT1P_MAP_ENTRY,
-                     BASE_QOS_TC_TO_DOT1P_MAP_ID,
-                     BASE_QOS_TC_TO_DOT1P_MAP_NAME,
-                     //keys
-                     BASE_QOS_TC_TO_DOT1P_MAP_ENTRY_TC,
-                     cps_api_object_ATTR_T_BIN,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-
-                     //attr
-                     BASE_QOS_TC_TO_DOT1P_MAP_ENTRY_DOT1P,
-                     cps_api_object_ATTR_T_BIN,
-                     _attr_parse_dot1p_fn,
-                     _attr_get_dot1p_fn,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-                     NULL,
-                     NULL,
-                    }
-                },
-                {NDI_QOS_MAP_TC_TO_DSCP,
-                    {BASE_QOS_TC_TO_DSCP_MAP_OBJ,
-                     BASE_QOS_TC_TO_DSCP_MAP_ENTRY,
-                     BASE_QOS_TC_TO_DSCP_MAP_ID,
-                     BASE_QOS_TC_TO_DSCP_MAP_NAME,
-                     //keys
-                     BASE_QOS_TC_TO_DSCP_MAP_ENTRY_TC,
-                     cps_api_object_ATTR_T_BIN,
-                     0, (cps_api_object_ATTR_TYPE_t)0,
-
-                     //attr
-                     BASE_QOS_TC_TO_DSCP_MAP_ENTRY_DSCP,
-                     cps_api_object_ATTR_T_BIN,
-                     _attr_parse_dscp_fn,
-                     _attr_get_dscp_fn,
                      0, (cps_api_object_ATTR_TYPE_t)0,
                      NULL,
                      NULL,
@@ -549,7 +467,7 @@ cps_api_return_code_t  qos_map_get_key(cps_api_object_t obj,
         }
         map_id = cps_api_object_attr_data_u64(map_attr);
 
-    } catch (std::out_of_range e) {
+    } catch (std::out_of_range&) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                     "attribute id for map_id is not mapped correctly");
         return cps_api_ret_code_ERR;
@@ -580,12 +498,8 @@ cps_api_return_code_t  qos_map_entry_get_key(cps_api_object_t obj,
         switch (type) {
         case NDI_QOS_MAP_DOT1P_TO_TC:
         case NDI_QOS_MAP_DOT1P_TO_COLOR:
-        case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
         case NDI_QOS_MAP_DSCP_TO_TC:
         case NDI_QOS_MAP_DSCP_TO_COLOR:
-        case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
-        case NDI_QOS_MAP_TC_TO_DSCP:
-        case NDI_QOS_MAP_TC_TO_DOT1P:
         case NDI_QOS_MAP_TC_TO_PG:
             key.any = *(uint8_t *)cps_api_object_attr_data_bin(entry_key_attr);
             break;
@@ -654,7 +568,7 @@ cps_api_return_code_t  qos_map_entry_get_key(cps_api_object_t obj,
             return cps_api_ret_code_ERR;
         }
 
-    } catch (std::out_of_range e) {
+    } catch (std::out_of_range&) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                     "attribute id for map entry key is not mapped correctly");
         return cps_api_ret_code_ERR;
@@ -691,7 +605,7 @@ cps_api_return_code_t qos_map_key_check(cps_api_object_t obj,
             return cps_api_ret_code_OK;
         }
 
-    } catch (std::out_of_range e) {
+    } catch (std::out_of_range&) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                     "object id or entry object id is not mapped correctly");
         return cps_api_ret_code_ERR;

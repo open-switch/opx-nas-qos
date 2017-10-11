@@ -122,6 +122,8 @@ bool nas_qos_buffer_pool::is_leaf_attr (nas_attr_id_t attr_id)
         {BASE_QOS_BUFFER_POOL_POOL_TYPE, true},
         {BASE_QOS_BUFFER_POOL_SIZE, true},
         {BASE_QOS_BUFFER_POOL_THRESHOLD_MODE, true},
+        {BASE_QOS_BUFFER_POOL_XOFF_SIZE, true},
+        {BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID, true},
 
         //The NPU ID list attribute is handled by the base object itself.
     };
@@ -139,6 +141,7 @@ bool nas_qos_buffer_pool::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 
     qos_buffer_pool_struct_t cfg= {0};
 
+    nas_qos_switch & nas_switch = const_cast<nas_qos_switch &>(get_switch());
     switch (attr_id) {
     case BASE_QOS_BUFFER_POOL_POOL_TYPE:
         cfg.type = get_type();
@@ -150,6 +153,14 @@ bool nas_qos_buffer_pool::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 
     case BASE_QOS_BUFFER_POOL_SIZE:
         cfg.size = get_size();
+        break;
+
+    case BASE_QOS_BUFFER_POOL_XOFF_SIZE:
+        cfg.xoff_size = get_xoff_size();
+        break;
+
+    case BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID:
+        cfg.wred_profile_id = nas_switch.nas2ndi_wred_profile_id(get_wred_profile_id(), npu_id);
         break;
 
 

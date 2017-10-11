@@ -46,6 +46,7 @@ typedef struct nas_qos_buffer_profile_struct{
     uint32_t shared_static_th;  // static threshold for the shared usage in bytes
     uint32_t xoff_th;   // XOFF threshold in bytes
     uint32_t xon_th;    // XON threshold in bytes
+    uint32_t xon_offset_th;  // XON hysteresis offset
     char     name[BUFFER_PROFILE_NAME_LEN];  // name string of the buffer profile
 }nas_qos_buffer_profile_struct_t;
 
@@ -95,6 +96,8 @@ public:
 
     uint32_t get_xon_th() const {return cfg.xon_th;}
     void     set_xon_th(uint32_t th) {cfg.xon_th = th;}
+    uint32_t get_xon_offset_th() const {return cfg.xon_offset_th;}
+    void     set_xon_offset_th(uint32_t th) {cfg.xon_offset_th = th;}
 
     const char *   get_name() const {return cfg.name;}
     void     set_name(const char *name) {

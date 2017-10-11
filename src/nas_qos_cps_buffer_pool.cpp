@@ -173,6 +173,11 @@ static cps_api_return_code_t _append_one_buffer_pool(cps_api_get_params_t * para
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_POOL_THRESHOLD_MODE,
             buffer_pool->get_threshold_mode());
 
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_POOL_XOFF_SIZE,
+            buffer_pool->get_xoff_size());
+
+    cps_api_object_attr_add_u64(ret_obj, BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID,
+            buffer_pool->get_wred_profile_id());
     return cps_api_ret_code_OK;
 }
 
@@ -250,7 +255,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Create error code: %d ",
                     e.err_code);
@@ -325,7 +330,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_set(
         // update the local cache with newly set values
         *buffer_pool_p = buffer_pool;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Attr Modify error code: %d ",
                     e.err_code);
@@ -392,7 +397,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
 
         p_switch->remove_buffer_pool(buffer_pool_p->get_buffer_pool_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Delete error code: %d ",
                     e.err_code);
@@ -431,6 +436,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
                                               nas_qos_buffer_pool &buffer_pool)
 {
     uint_t val;
+    uint64_t lval;
     cps_api_object_it_t it;
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
@@ -460,6 +466,17 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             buffer_pool.set_threshold_mode((BASE_QOS_BUFFER_THRESHOLD_MODE_t)val);
             break;
 
+        case BASE_QOS_BUFFER_POOL_XOFF_SIZE:
+            val = cps_api_object_attr_data_u32(it.attr);
+            buffer_pool.mark_attr_dirty(id);
+            buffer_pool.set_xoff_size(val);
+            break;
+
+        case BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID:
+            lval = cps_api_object_attr_data_u64(it.attr);
+            buffer_pool.mark_attr_dirty(id);
+            buffer_pool.set_wred_profile_id(lval);
+            break;
         case CPS_API_ATTR_RESERVE_RANGE_END:
             // skip keys
             break;
@@ -509,6 +526,15 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
 
         case BASE_QOS_BUFFER_POOL_THRESHOLD_MODE:
             cps_api_object_attr_add_u32(obj, attr_id, buffer_pool.get_threshold_mode());
+            break;
+
+        case BASE_QOS_BUFFER_POOL_XOFF_SIZE:
+            cps_api_object_attr_add_u32(obj, attr_id, buffer_pool.get_xoff_size());
+            break;
+
+        case BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID:
+            cps_api_object_attr_add_u64(obj, attr_id,
+                                    buffer_pool.get_wred_profile_id());
             break;
 
         default:

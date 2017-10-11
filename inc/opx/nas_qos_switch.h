@@ -37,9 +37,11 @@
 #include "nas_qos_buffer_pool.h"
 #include "nas_qos_buffer_profile.h"
 #include "nas_qos_priority_group.h"
+#include "nas_qos_port_pool.h"
 
 #include <unordered_map>
 #include <map>
+#include <mutex>
 
 typedef std::unordered_map<nas_obj_id_t, nas_qos_policer> policer_list_t;
 typedef policer_list_t::iterator policer_iter_t;
@@ -74,6 +76,8 @@ typedef buffer_profile_list_t::iterator buffer_profile_iter_t;
 typedef std::map<nas_qos_priority_group_key_t, nas_qos_priority_group> priority_group_list_t;
 typedef priority_group_list_t::iterator priority_group_iter_t;
 
+typedef std::map<nas_qos_port_pool_key_t, nas_qos_port_pool> port_pool_list_t;
+typedef port_pool_list_t::iterator port_pool_iter_t;
 class nas_qos_switch : public nas::base_switch_t
 {
     /************  Policers **********************************/
@@ -147,8 +151,11 @@ class nas_qos_switch : public nas::base_switch_t
     /************* Port Egress *************************************/
     port_egr_list_t port_egrs;
 
+    /************* Port Pools **************************************/
+    port_pool_list_t port_pools;
 public:
 
+    mutable std::recursive_mutex mtx;
     /* Default Constructor & Destructor */
     nas_qos_switch (nas_obj_id_t id): base_switch_t(id) {
         ucast_queues_per_port = 0;
@@ -213,6 +220,8 @@ public:
     uint_t    get_number_of_port_queues(hal_ifindex_t port_id);
     bool      port_queue_is_initialized(hal_ifindex_t port_id);
 
+    // handler upon port deletion
+    bool      delete_queue_by_ifindex(hal_ifindex_t port_id);
 
     /************* Schedulers *******************/
     t_std_error     add_scheduler (nas_qos_scheduler &t);
@@ -247,6 +256,8 @@ public:
     scheduler_group_iter_t get_scheduler_group_it_begin() {return scheduler_groups.begin();}
     scheduler_group_iter_t get_scheduler_group_it_end()   {return scheduler_groups.end();}
 
+    // handler upon port deletion
+    bool      delete_sg_by_ifindex(hal_ifindex_t port_id);
     /************* Map *******************/
     t_std_error     add_map (nas_qos_map &t);
 
@@ -307,6 +318,7 @@ public:
     uint_t    get_number_of_port_priority_groups(hal_ifindex_t port_id);
     bool      port_priority_group_is_initialized(hal_ifindex_t port_id);
 
+    bool      delete_pg_by_ifindex(hal_ifindex_t port_id);
 
     /************* Port Ingress *******************/
     t_std_error             add_port_ingress(nas_qos_port_ingress& t);
@@ -329,6 +341,15 @@ public:
     void                    dump_all_port_egr_profile();
 
     bool                    port_egr_is_initialized(hal_ifindex_t port_id);
+    /************** Port Pool ***************/
+    t_std_error             add_port_pool(nas_qos_port_pool& t);
+
+    void                    remove_port_pool(hal_ifindex_t port_id, nas_obj_id_t pool_id);
+
+    nas_qos_port_pool*      get_port_pool(hal_ifindex_t port_id, nas_obj_id_t pool_id);
+
+    port_pool_iter_t get_port_pool_it_begin() {return port_pools.begin();}
+    port_pool_iter_t get_port_pool_it_end()   {return port_pools.end();}
 
     /*****  common nas-id to ndi-id translation functions  *******/
     ndi_obj_id_t nas2ndi_scheduler_profile_id(nas_obj_id_t id, npu_id_t npu_id);

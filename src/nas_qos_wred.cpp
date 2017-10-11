@@ -134,6 +134,7 @@ bool nas_qos_wred::is_leaf_attr (nas_attr_id_t attr_id)
         {BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY,    true},
         {BASE_QOS_WRED_PROFILE_WEIGHT,        true},
         {BASE_QOS_WRED_PROFILE_ECN_ENABLE,    true},
+        {BASE_QOS_WRED_PROFILE_ECN_MARK,      true},
         {BASE_QOS_WRED_PROFILE_NPU_ID_LIST,   true},
 
         //The NPU ID list attribute is handled by the base object itself.
@@ -205,8 +206,13 @@ bool nas_qos_wred::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
         cfg.weight = get_weight();
         break;
 
+    // TO be deprecated
     case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
-        cfg.ecn_enable = get_ecn_enable();
+        cfg.ecn_mark = (BASE_QOS_ECN_MARK_MODE_t)get_ecn_enable();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_MARK:
+        cfg.ecn_mark = get_ecn_mark();
         break;
 
     case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:

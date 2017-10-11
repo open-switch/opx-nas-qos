@@ -101,14 +101,10 @@ t_std_error nas_qos_map::add_map_entry(nas_qos_map_entry_key_t key,
     map_entries * entries;
 
     switch (this->get_type()) {
-    case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
     case NDI_QOS_MAP_DOT1P_TO_TC:
     case NDI_QOS_MAP_DOT1P_TO_COLOR:
-    case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
     case NDI_QOS_MAP_DSCP_TO_TC:
     case NDI_QOS_MAP_DSCP_TO_COLOR:
-    case NDI_QOS_MAP_TC_TO_DOT1P:
-    case NDI_QOS_MAP_TC_TO_DSCP:
     case NDI_QOS_MAP_TC_COLOR_TO_DOT1P:
     case NDI_QOS_MAP_TC_COLOR_TO_DSCP:
     case NDI_QOS_MAP_TC_TO_QUEUE:
@@ -134,11 +130,6 @@ t_std_error nas_qos_map::add_map_entry(nas_qos_map_entry_key_t key,
         nas_qos_map_entry & ent = it->second;
         //overwrite existing entry
         switch (this->get_type()) {
-        case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
-        case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
-            ent.set_value_tc(entry.get_value().tc);
-            ent.set_value_color(entry.get_value().color);
-            break;
         case NDI_QOS_MAP_DOT1P_TO_TC:
         case NDI_QOS_MAP_DSCP_TO_TC:
             ent.set_value_tc(entry.get_value().tc);
@@ -147,11 +138,9 @@ t_std_error nas_qos_map::add_map_entry(nas_qos_map_entry_key_t key,
         case NDI_QOS_MAP_DSCP_TO_COLOR:
             ent.set_value_color(entry.get_value().color);
             break;
-        case NDI_QOS_MAP_TC_TO_DOT1P:
         case NDI_QOS_MAP_TC_COLOR_TO_DOT1P:
             ent.set_value_dot1p(entry.get_value().dot1p);
             break;
-        case NDI_QOS_MAP_TC_TO_DSCP:
         case NDI_QOS_MAP_TC_COLOR_TO_DSCP:
             ent.set_value_dscp(entry.get_value().dscp);
             break;
@@ -196,14 +185,10 @@ t_std_error nas_qos_map::del_map_entry(nas_qos_map_entry_key_t key)
 map_entries * nas_qos_map::get_map_entries()
 {
     switch (this->get_type()) {
-    case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
     case NDI_QOS_MAP_DOT1P_TO_TC:
     case NDI_QOS_MAP_DOT1P_TO_COLOR:
-    case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
     case NDI_QOS_MAP_DSCP_TO_TC:
     case NDI_QOS_MAP_DSCP_TO_COLOR:
-    case NDI_QOS_MAP_TC_TO_DOT1P:
-    case NDI_QOS_MAP_TC_TO_DSCP:
     case NDI_QOS_MAP_TC_COLOR_TO_DOT1P:
     case NDI_QOS_MAP_TC_COLOR_TO_DSCP:
     case NDI_QOS_MAP_TC_TO_QUEUE:

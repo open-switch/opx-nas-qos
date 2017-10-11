@@ -256,7 +256,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Create error code: %d ",
                     e.err_code);
@@ -328,7 +328,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_set(
         // update the local cache with newly set values
         *scheduler_p = scheduler;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Attr Modify error code: %d ",
                     e.err_code);
@@ -396,7 +396,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_delete(
 
         p_switch->remove_scheduler(scheduler_p->get_scheduler_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Delete error code: %d ",
                     e.err_code);

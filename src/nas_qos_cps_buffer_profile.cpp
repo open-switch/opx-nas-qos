@@ -179,6 +179,8 @@ static cps_api_return_code_t _append_one_buffer_profile(cps_api_get_params_t * p
             buffer_profile->get_xoff_th());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_XON_THRESHOLD,
             buffer_profile->get_xon_th());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_PROFILE_XON_OFFSET_THRESHOLD,
+            buffer_profile->get_xon_offset_th());
     cps_api_object_attr_add(ret_obj, BASE_QOS_BUFFER_PROFILE_NAME,
             buffer_profile->get_name(), BUFFER_PROFILE_NAME_LEN);
 
@@ -259,7 +261,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_profile Create error code: %d ",
                     e.err_code);
@@ -334,7 +336,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_set(
         // update the local cache with newly set values
         *buffer_profile_p = buffer_profile;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_profile Attr Modify error code: %d ",
                     e.err_code);
@@ -401,7 +403,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_delete(
 
         p_switch->remove_buffer_profile(buffer_profile_p->get_buffer_profile_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_profile Delete error code: %d ",
                     e.err_code);
@@ -500,6 +502,11 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             buffer_profile.set_xon_th(val);
             break;
 
+        case BASE_QOS_BUFFER_PROFILE_XON_OFFSET_THRESHOLD:
+            val = cps_api_object_attr_data_u32(it.attr);
+            buffer_profile.mark_attr_dirty(id);
+            buffer_profile.set_xon_offset_th(val);
+            break;
         case BASE_QOS_BUFFER_PROFILE_NAME:
             ptr = (char *)cps_api_object_attr_data_bin(it.attr);
             buffer_profile.set_name(ptr);
@@ -576,6 +583,11 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
         case BASE_QOS_BUFFER_PROFILE_XON_THRESHOLD:
             cps_api_object_attr_add_u32(obj, attr_id,
                     buffer_profile.get_xon_th());
+            break;
+
+        case BASE_QOS_BUFFER_PROFILE_XON_OFFSET_THRESHOLD:
+            cps_api_object_attr_add_u32(obj, attr_id,
+                    buffer_profile.get_xon_offset_th());
             break;
 
         case BASE_QOS_BUFFER_PROFILE_NAME:

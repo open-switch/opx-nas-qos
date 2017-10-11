@@ -59,11 +59,23 @@ def set_port_egr_map(port_name, map_id, eg_map_name):
         print "Successfully set " + eg_map_name + " for port " + port_name
 
 
-def modify_ing_map(in_map_name, map_id, mod_list, new_list):
+def modify_dot1p_to_tc_map(in_map_name, map_id, mod_list, new_list):
     # Modify existing map table entry
     m = nas_qos.MapCPSObjs(in_map_name, map_id=map_id)
-    mod_list = [(1, 2, 'GREEN'), (2, 6, 'RED')]
-    new_list = [(5, 3, 'YELLOW'), (6, 4, 'RED')]
+    mod_list = [(1, 2), (2, 6)]
+    new_list = [(5, 3), (6, 4)]
+    m.mod_entries(mod_list)
+    m.new_entries(new_list)
+    if m.commit() == False:
+        print "Failed to modify " + in_map_name
+    else:
+        print "Successfully modified " + in_map_name
+
+def modify_dot1p_to_color_map(in_map_name, map_id, mod_list, new_list):
+    # Modify existing map table entry
+    m = nas_qos.MapCPSObjs(in_map_name, map_id=map_id)
+    mod_list = [(1, 'GREEN'), (2, 'RED')]
+    new_list = [(5, 'YELLOW'), (6, 'RED')]
     m.mod_entries(mod_list)
     m.new_entries(new_list)
     if m.commit() == False:
@@ -95,12 +107,19 @@ def delete_map_entry(map_name, map_id, entry_list):
 if __name__ == '__main__':
 
     # Each tuple in the list has the following form (dot1p, tc, color)
-    d2tc_entries = [(0, 0, 'RED'),
-                    (1, 1, 'GREEN'),
-                    (2, 5, 'RED')]
+    d2tc_entries = [(0, 0),
+                    (1, 1),
+                    (2, 5)]
     map_name = 'new-d2tc-map'
-    d2tc_id = create_ing_map('dot1p-to-tc-color-map', d2tc_entries, map_name=map_name)
-    set_port_ing_map('e101-003-0', d2tc_id, 'dot1p-to-tc-color-map')
+    d2tc_id = create_ing_map('dot1p-to-tc-map', d2tc_entries, map_name=map_name)
+    set_port_ing_map('e101-003-0', d2tc_id, 'dot1p-to-tc-map')
+
+    d2color_entries = [(0, 'RED'),
+                       (1, 'GREEN'),
+                       (2, 'RED')]
+    map_name = 'new-d2color-map'
+    d2color_id = create_ing_map('dot1p-to-color-map', d2color_entries, map_name=map_name)
+    set_port_ing_map('e101-003-0', d2color_id, 'dot1p-to-color-map')
 
     # Each tuple in the list has the following form (tc, queue-type,
     # queue-number)
@@ -117,11 +136,17 @@ if __name__ == '__main__':
     get_map('tc-to-queue-map', tc2q_id)
 
 
-    get_map('dot1p-to-tc-color-map', d2tc_id)
-    mod_list = [(1, 2, 'GREEN'), (2, 6, 'RED')]
-    new_list = [(5, 3, 'YELLOW'), (6, 4, 'RED')]
-    modify_ing_map('dot1p-to-tc-color-map', d2tc_id, mod_list, new_list)
-    get_map('dot1p-to-tc-color-map', d2tc_id)
+    get_map('dot1p-to-tc-map', d2tc_id)
+    mod_list = [(1, 2), (2, 6)]
+    new_list = [(5, 3), (6, 4)]
+    modify_dot1p_to_tc_map('dot1p-to-tc-map', d2tc_id, mod_list, new_list)
+    get_map('dot1p-to-tc-map', d2tc_id)
+
+    get_map('dot1p-to-color-map', d2color_id)
+    mod_list = []
+    new_list = [(5, 'YELLOW'), (6, 'RED')]
+    modify_dot1p_to_color_map('dot1p-to-color-map', d2color_id, mod_list, new_list)
+    get_map('dot1p-to-color-map', d2color_id)
 
     ''' not supported yet
     # Each tuple in the list has the following form (tc, color, dot1p)

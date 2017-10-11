@@ -187,6 +187,14 @@ def enum_map_get():
         'base-qos:buffer-threshold-mode:DYNAMIC': 2,
 
 
+        'base-qos:ecn-mark-mode:NONE': 0,
+        'base-qos:ecn-mark-mode:GREEN': 1,
+        'base-qos:ecn-mark-mode:YELLOW': 2,
+        'base-qos:ecn-mark-mode:RED': 3,
+        'base-qos:ecn-mark-mode:GREEN-YELLOW': 4,
+        'base-qos:ecn-mark-mode:GREEN-RED': 5,
+        'base-qos:ecn-mark-mode:YELLOW-RED': 6,
+        'base-qos:ecn-mark-mode:ALL': 7,
 
     }
     return enum_map

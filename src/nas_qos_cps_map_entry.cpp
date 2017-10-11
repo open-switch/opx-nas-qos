@@ -432,7 +432,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
                 cps_api_object_clone(tmp_obj, obj);
             }
         }
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS %s Create error code: %d ",
                     (is_map_entry? "Map Entry": "Map"),
@@ -552,7 +552,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_set(
         // update the local cache with newly set values
         old_entry = entry;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Attr Modify error code: %d ",
                     e.err_code);
@@ -666,11 +666,15 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
             map_p->del_map_entry(key);
 
         }
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Delete error code: %d ",
                     e.err_code);
         return NAS_QOS_E_FAIL;
+    } catch (std::out_of_range&) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                    "NAS Map Delete failed: Out of range");
+        return NAS_QOS_E_KEY_VAL;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Delete: Unexpected error");
@@ -945,14 +949,10 @@ static void _fill_entry_key_data(cps_api_object_t obj,
 {
     nas_attr_id_t obj_id = qos_map_entry_key_1_obj_id(map_type);
     switch (map_type) {
-    case NDI_QOS_MAP_DOT1P_TO_TC_COLOR:
     case NDI_QOS_MAP_DOT1P_TO_TC:
     case NDI_QOS_MAP_DOT1P_TO_COLOR:
-    case NDI_QOS_MAP_DSCP_TO_TC_COLOR:
     case NDI_QOS_MAP_DSCP_TO_TC:
     case NDI_QOS_MAP_DSCP_TO_COLOR:
-    case NDI_QOS_MAP_TC_TO_DSCP:
-    case NDI_QOS_MAP_TC_TO_DOT1P:
     case NDI_QOS_MAP_TC_TO_PG:
     {
         uint8_t val8 = (uint8_t)key.any;

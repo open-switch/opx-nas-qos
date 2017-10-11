@@ -41,31 +41,22 @@
 
 static std_mutex_lock_create_static_init_rec(map_mutex);
 
-static std::unordered_map<nas_attr_id_t, nas_qos_map_type_t, std::hash<int>>
-        _yang_obj_id_to_nas_type_map = {
+static bool _yang_obj_id_to_nas_type_get(nas_attr_id_t attr_id, nas_qos_map_type_t *ndi_map_type)
+{
+    static const auto & _yang_obj_id_to_nas_type_map =
+            * new std::unordered_map<nas_attr_id_t, nas_qos_map_type_t, std::hash<int>>
+    {
                 {BASE_QOS_DOT1P_TO_TC_MAP_OBJ,
                     NDI_QOS_MAP_DOT1P_TO_TC,
                 },
                 {BASE_QOS_DOT1P_TO_COLOR_MAP_OBJ,
                     NDI_QOS_MAP_DOT1P_TO_COLOR,
                 },
-                {BASE_QOS_DOT1P_TO_TC_COLOR_MAP_OBJ,
-                    NDI_QOS_MAP_DOT1P_TO_TC_COLOR,
-                },
                 {BASE_QOS_DSCP_TO_TC_MAP_OBJ,
                     NDI_QOS_MAP_DSCP_TO_TC,
                 },
                 {BASE_QOS_DSCP_TO_COLOR_MAP_OBJ,
                     NDI_QOS_MAP_DSCP_TO_COLOR,
-                },
-                {BASE_QOS_DSCP_TO_TC_COLOR_MAP_OBJ,
-                    NDI_QOS_MAP_DSCP_TO_TC_COLOR,
-                },
-                {BASE_QOS_TC_TO_DSCP_MAP_OBJ,
-                    NDI_QOS_MAP_TC_TO_DSCP,
-                },
-                {BASE_QOS_TC_TO_DOT1P_MAP_OBJ,
-                    NDI_QOS_MAP_TC_TO_DOT1P,
                 },
                 {BASE_QOS_TC_TO_QUEUE_MAP_OBJ,
                     NDI_QOS_MAP_TC_TO_QUEUE,
@@ -87,6 +78,14 @@ static std::unordered_map<nas_attr_id_t, nas_qos_map_type_t, std::hash<int>>
                 },
         };
 
+    try {
+        *ndi_map_type = _yang_obj_id_to_nas_type_map.at(attr_id);
+    }
+    catch (...) {
+        return false;
+    }
+    return true;
+}
 /**
   * This function provides NAS-QoS Map CPS API write function
   * @Param    Standard CPS API params
@@ -106,14 +105,10 @@ cps_api_return_code_t nas_qos_cps_api_map_write(void * context,
 
     /* Parse sub-category */
     uint_t subcat_id = cps_api_key_get_subcat(cps_api_object_key(obj));
-    try {
-        rc = nas_qos_cps_api_map_write_type(context, param, ix,
-                _yang_obj_id_to_nas_type_map.at(subcat_id));
-
-    }
-    catch (...) {
+    nas_qos_map_type_t map_type;
+    if (_yang_obj_id_to_nas_type_get(subcat_id, &map_type) != true)
         return NAS_QOS_E_FAIL;
-    }
+    rc = nas_qos_cps_api_map_write_type(context, param, ix, map_type);
 
     return rc;
 }
@@ -138,15 +133,11 @@ cps_api_return_code_t nas_qos_cps_api_map_read (void * context,
 
     /* Parse sub-category */
     uint_t subcat_id = cps_api_key_get_subcat(cps_api_object_key(obj));
-    try {
-        rc = nas_qos_cps_api_map_read_type(context, param, ix,
-                _yang_obj_id_to_nas_type_map.at(subcat_id));
-
-    }
-    catch (...) {
+    nas_qos_map_type_t map_type;
+    if (_yang_obj_id_to_nas_type_get(subcat_id, &map_type) != true)
         return NAS_QOS_E_FAIL;
-    }
 
+    rc = nas_qos_cps_api_map_read_type(context, param, ix, map_type);
 
     return rc;
 }
@@ -171,14 +162,11 @@ cps_api_return_code_t nas_qos_cps_api_map_rollback(void * context,
 
     /* Parse sub-category */
     uint_t subcat_id = cps_api_key_get_subcat(cps_api_object_key(obj));
-    try {
-        rc = nas_qos_cps_api_map_rollback_type(context, param, ix,
-                _yang_obj_id_to_nas_type_map.at(subcat_id));
 
-    }
-    catch (...) {
+    nas_qos_map_type_t map_type;
+    if (_yang_obj_id_to_nas_type_get(subcat_id, &map_type) != true)
         return NAS_QOS_E_FAIL;
-    }
+    rc = nas_qos_cps_api_map_rollback_type(context, param, ix, map_type);
 
     return rc;
 }

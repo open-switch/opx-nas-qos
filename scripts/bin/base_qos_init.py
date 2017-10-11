@@ -40,8 +40,10 @@ def get_cfg():
     return target_cfg_path + '/base_qos_init.xml'
 
 map_types = [
-    'dot1p-to-tc-color-map', 'dscp-to-tc-color-map', 'tc-color-to-dot1p-map',
-    'tc-color-to-dscp-map', 'tc-to-queue-map', 'tc-to-priority-group-map']
+    'dot1p-to-tc-map', 'dot1p-to-color-map',
+    'dscp-to-tc-map', 'dscp-to-color-map',
+    'tc-color-to-dot1p-map', 'tc-color-to-dscp-map',
+    'tc-to-queue-map', 'tc-to-priority-group-map']
 
 unsupported_map_types = ['tc-color-to-dot1p-map', 'tc-color-to-dscp-map']
 

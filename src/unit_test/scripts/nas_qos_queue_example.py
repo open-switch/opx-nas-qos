@@ -74,7 +74,7 @@ def wred_profile_create_example():
         'yellow-max-threshold': 60,
         'yellow-drop-probability': 30,
         'weight': 8,
-        'ecn-enable': 1,
+        'ecn-mark': 'ALL',
         'npu-id-list': [0],
     }
 

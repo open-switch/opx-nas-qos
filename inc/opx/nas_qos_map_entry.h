@@ -68,12 +68,8 @@ public:
 
     void    set_value_tc(uint_t val) {
         value.tc = val;
-        if (type == NDI_QOS_MAP_DOT1P_TO_TC_COLOR)
-            mark_attr_dirty(BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_TC);
-        else if (type == NDI_QOS_MAP_DOT1P_TO_TC)
+        if (type == NDI_QOS_MAP_DOT1P_TO_TC)
             mark_attr_dirty(BASE_QOS_DOT1P_TO_TC_MAP_ENTRY_TC);
-        else if (type == NDI_QOS_MAP_DSCP_TO_TC_COLOR)
-            mark_attr_dirty(BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_TC);
         else if (type == NDI_QOS_MAP_DSCP_TO_TC)
             mark_attr_dirty(BASE_QOS_DSCP_TO_TC_MAP_ENTRY_TC);
 
@@ -81,29 +77,21 @@ public:
 
     void     set_value_color(BASE_QOS_PACKET_COLOR_t val) {
         value.color = val;
-        if (type == NDI_QOS_MAP_DOT1P_TO_TC_COLOR)
-            mark_attr_dirty(BASE_QOS_DOT1P_TO_TC_COLOR_MAP_ENTRY_COLOR);
-        else if (type == NDI_QOS_MAP_DOT1P_TO_COLOR)
+        if (type == NDI_QOS_MAP_DOT1P_TO_COLOR)
             mark_attr_dirty(BASE_QOS_DOT1P_TO_COLOR_MAP_ENTRY_COLOR);
-        else if (type == NDI_QOS_MAP_DSCP_TO_TC_COLOR)
-            mark_attr_dirty(BASE_QOS_DSCP_TO_TC_COLOR_MAP_ENTRY_COLOR);
         else if (type == NDI_QOS_MAP_DSCP_TO_COLOR)
             mark_attr_dirty(BASE_QOS_DSCP_TO_COLOR_MAP_ENTRY_COLOR);
     }
 
     void    set_value_dot1p(uint_t val) {
         value.dot1p = val;
-        if (type == NDI_QOS_MAP_TC_TO_DOT1P)
-            mark_attr_dirty(BASE_QOS_TC_TO_DOT1P_MAP_ENTRY_DOT1P);
-        else if (type == NDI_QOS_MAP_TC_COLOR_TO_DOT1P)
+        if (type == NDI_QOS_MAP_TC_COLOR_TO_DOT1P)
             mark_attr_dirty(BASE_QOS_TC_COLOR_TO_DOT1P_MAP_ENTRY_DOT1P);
     }
 
     void    set_value_dscp(uint_t val) {
         value.dscp = val;
-        if (type == NDI_QOS_MAP_TC_TO_DSCP)
-            mark_attr_dirty(BASE_QOS_TC_TO_DSCP_MAP_ENTRY_DSCP);
-        else if (type == NDI_QOS_MAP_TC_COLOR_TO_DSCP)
+        if (type == NDI_QOS_MAP_TC_COLOR_TO_DSCP)
             mark_attr_dirty(BASE_QOS_TC_COLOR_TO_DSCP_MAP_ENTRY_DSCP);
     }
 

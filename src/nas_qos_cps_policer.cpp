@@ -279,7 +279,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_create(
 
         }
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Create error code: %d ",
                     e.err_code);
@@ -371,7 +371,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_set(
         // update the local cache with newly set values
         *policer_p = policer;
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Attr Modify error code: %d ",
                     e.err_code);
@@ -435,7 +435,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_delete(
 
         p_switch->remove_policer(policer_p->policer_id());
 
-    } catch (nas::base_exception e) {
+    } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Delete error code: %d ",
                     e.err_code);

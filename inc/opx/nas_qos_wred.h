@@ -100,9 +100,18 @@ public:
     uint_t  get_weight() const {return cfg.weight;}
     void    set_weight(uint_t val) {cfg.weight = val;}
 
-    bool    get_ecn_enable()  const  {return cfg.ecn_enable;}
-    void    set_ecn_enable(bool val) {cfg.ecn_enable = val;}
+    // To be deprecated
+    bool    get_ecn_enable()  const  {
+                return (cfg.ecn_mark == BASE_QOS_ECN_MARK_MODE_ALL?
+                        true: false);
+            }
+    void    set_ecn_enable(bool val) {
+                cfg.ecn_mark = (val? BASE_QOS_ECN_MARK_MODE_ALL:
+                                     BASE_QOS_ECN_MARK_MODE_NONE);
+            }
 
+    BASE_QOS_ECN_MARK_MODE_t get_ecn_mark() const {return cfg.ecn_mark;}
+    void    set_ecn_mark(BASE_QOS_ECN_MARK_MODE_t val) {cfg.ecn_mark = val;}
 
 
     /// Overriding base object virtual functions
