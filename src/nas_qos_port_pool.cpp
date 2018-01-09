@@ -16,16 +16,14 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_port_pool.h"
 #include "dell-base-qos.h"
 #include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_port_pool::nas_qos_port_pool (nas_qos_switch* switch_p,
+nas_qos_port_pool::nas_qos_port_pool (nas_qos_switch* p_switch,
                             hal_ifindex_t port, nas_obj_id_t pool_id)
-           : base_obj_t(switch_p)
+           : base_obj_t(p_switch)
 {
     key.port_id = port;
     key.pool_id = pool_id;

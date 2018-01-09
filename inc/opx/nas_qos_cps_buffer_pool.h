@@ -56,4 +56,13 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_rollback(void * context,
 cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
                                             cps_api_get_params_t * param,
                                             size_t ix);
+/**
+  * This function provides NAS-QoS buffer_pool stats CPS API clear function
+  * User can use this function to clear the buffer_pool stats by setting relevant counters to zero
+  * @Param    Standard CPS API params
+  * @Return   Standard Error Code
+  */
+cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
+                                            cps_api_transaction_params_t * param,
+                                            size_t ix);
 #endif

@@ -17,9 +17,26 @@
 
 import cps_utils
 import cps
+import sys
 import nas_qos
 import nas_qos_buffer_pool_example
 import nas_qos_buffer_profile_example
+
+import sys
+import nas_os_if_utils
+import ifindex_utils
+
+def get_first_phy_port():
+    ret_data_list = nas_os_if_utils.nas_os_if_list()
+    if not ret_data_list:
+        return None
+    name_list = []
+    for ret_data in ret_data_list:
+        cps_obj = cps_utils.CPSObject(obj=ret_data)
+        port_name = cps_obj.get_attr_data('if/interfaces/interface/name')
+        name_list.append(port_name)
+    name_list.sort()
+    return name_list[0]
 
 def priority_group_get_example(port_id, local_id):
     return_data_list = []
@@ -92,24 +109,29 @@ def buffer_pool_stat_get_example (id):
 
 
 if __name__ == '__main__':
-    port_id = 17
+    if len(sys.argv) >= 2:
+        port_name = sys.argv[1]
+    else:
+        port_name = get_first_phy_port()
+
+    port_id = ifindex_utils.if_nametoindex(port_name)
 
     print '### Show all priority_groups of port %d ###' % port_id
     priority_group_get_example(port_id, None)
 
     buffer_pool_id = nas_qos_buffer_pool_example.buffer_pool_create_example('INGRESS')
     if buffer_pool_id is None:
-        exit()
+        sys.exit(0)
 
     buffer_profile_id = nas_qos_buffer_profile_example.buffer_profile_create_example(buffer_pool_id)
     if buffer_profile_id is None:
-        exit()
+        sys.exit(0)
 
     local_id = 1
     priority_group_get_example(port_id, local_id)
     priority_group_id = priority_group_modify_buffer_profile_example(port_id, local_id, buffer_profile_id)
     if priority_group_id is None:
-        exit()
+        sys.exit(0)
 
     priority_group_get_example(port_id, local_id)
 
@@ -125,7 +147,7 @@ if __name__ == '__main__':
     # reset
     priority_group_id = priority_group_modify_buffer_profile_example(port_id, local_id, 0)
     if priority_group_id is None:
-        exit()
+        sys.exit(0)
 
     nas_qos_buffer_profile_example.buffer_profile_delete_example(buffer_profile_id)
     nas_qos_buffer_pool_example.buffer_pool_delete_example(buffer_pool_id)

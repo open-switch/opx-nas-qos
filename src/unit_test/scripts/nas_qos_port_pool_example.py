@@ -40,6 +40,7 @@ def port_pool_create_example(port_id, pool_id):
 
     print 'Return = ', ret_cps_data
     print "Successfully installed port pool on port: %d pool: %d " % (port_id, pool_id)
+    return pool_id
 
 
 def port_pool_get_example(port_id, pool_id):

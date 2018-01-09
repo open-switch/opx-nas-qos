@@ -76,6 +76,15 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
             }
         }
 
+        /* Cache switch-wise HQoS tree level */
+        if (ndi_switch_get_max_number_of_scheduler_group_level(sw->npus[0],
+                &(p_switch->max_sched_group_level)) != STD_ERR_OK) {
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Failed to get MAX number of SG Levels");
+            delete p_switch;
+            return NULL;
+        }
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "MAX_SG _LEVEL %d ", p_switch->max_sched_group_level);
+
         if (nas_qos_add_switch(switch_id, p_switch) != STD_ERR_OK) {
             delete p_switch;
             return NULL;
@@ -105,7 +114,6 @@ t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch* s)
         return NAS_BASE_E_DUPLICATE;
     }
 
-    // insert
     try {
         nas_qos_switch_list_cache.insert(std::make_pair(switch_id, s));
     }
@@ -189,7 +197,7 @@ bool nas_qos_get_port_intf(uint_t ifindex, interface_ctrl_t *intf_ctrl)
 void nas_qos_if_delete_notify(uint_t ifindex)
 {
 
-    EV_LOGGING(QOS, WARNING, "QOS", "ifindex: %d is being deleted", ifindex);
+    EV_LOGGING(QOS, NOTICE, "QOS-if-delete", "ifindex: %d is being deleted", ifindex);
 
     nas_qos_switch * p_switch = nas_qos_get_switch(0);
 
@@ -213,7 +221,135 @@ void nas_qos_if_delete_notify(uint_t ifindex)
     // delete PG
     p_switch->delete_pg_by_ifindex(ifindex);
 
+    // clear init-port-list
+    p_switch->del_initialized_port(ifindex);
 
     return;
 }
 
+/*
+ *  This function initializes interface-related structure upon interface creation event
+ *  within NAS-QoS.
+ *
+ *  @Param ifindex
+ *  @return
+ *
+ */
+void nas_qos_if_create_notify(uint_t ifindex)
+{
+
+    EV_LOGGING(QOS, NOTICE, "QOS-if-create",
+            "Receiving ifindex: %d creation event or on-demand request", ifindex);
+
+    interface_ctrl_t intf_ctrl;
+
+    if (nas_qos_get_port_intf(ifindex, &intf_ctrl) == false) {
+        EV_LOGGING(QOS, NOTICE, "QOS-if-create",
+                     "Cannot find ifindex %u in nas-intf. Possibly recently deleted.",
+                     ifindex);
+        return ;
+    }
+
+    ndi_port_t ndi_port_id;
+    ndi_port_id.npu_id = intf_ctrl.npu_id;
+    ndi_port_id.npu_port = intf_ctrl.port_id;
+
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS-if-create",
+                     "switch_id of npu_id: %u cannot be found/created",
+                     ndi_port_id.npu_id);
+        return ;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    // initialization order is important!
+    // create Queues & SGs
+    if (!(p_switch->port_queue_is_initialized(ifindex) &&
+          p_switch->port_sg_is_initialized(ifindex)))
+        nas_qos_port_hqos_init(ifindex, ndi_port_id);
+
+    // create PG
+    if (!(p_switch->port_priority_group_is_initialized(ifindex)))
+        nas_qos_port_priority_group_init(ifindex, ndi_port_id);
+
+    // create port-ingress
+    if (!(p_switch->port_ing_is_initialized(ifindex)))
+        nas_qos_port_ingress_init(ifindex, ndi_port_id);
+
+    // create port-egress
+    if (!(p_switch->port_egr_is_initialized(ifindex)))
+        nas_qos_port_egress_init(ifindex, ndi_port_id);
+
+    // set init-port-list
+    p_switch->add_initialized_port(ifindex);
+
+    return;
+}
+
+/*
+ *  This function handles interface SET notification
+ *  within NAS-QoS.
+ *
+ *  @Param ifindex
+ *  @Param ndi_port
+ *  @Param isAdd: True: ifindex is associated to a new ndi_port
+ *                False: ifindex is disassociated from the ndi_port
+ *  @return
+ *
+ */
+void nas_qos_if_set_notify(uint_t ifindex, ndi_port_t ndi_port_id, bool isAdd)
+{
+
+    EV_LOGGING(QOS, NOTICE, "QOS-if-set", "Receiving ifindex: %d %s npu %d, port %d event",
+                ifindex, (isAdd? "association to": "disassociation from"),
+                ndi_port_id.npu_id, ndi_port_id.npu_port);
+
+    nas_qos_switch *p_switch = nas_qos_get_switch(0);
+    if (p_switch == NULL) {
+        return ;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
+    // The order is important here!
+    // Port Priority Group DB
+    nas_qos_port_priority_group_association(ifindex, ndi_port_id, isAdd);
+
+    // Queue DB
+    nas_qos_port_queue_association(ifindex, ndi_port_id, isAdd);
+
+    // Scheduler Group DB
+    nas_qos_port_scheduler_group_association(ifindex, ndi_port_id, isAdd);
+
+    // Port Ingress DB
+    nas_qos_port_ingress_association(ifindex, ndi_port_id, isAdd);
+
+    // Port Egress DB
+    nas_qos_port_egress_association(ifindex, ndi_port_id, isAdd);
+
+    // Port Pool
+    nas_qos_port_pool_association(ifindex, ndi_port_id, isAdd);
+
+    return;
+}
+
+/*
+ * This function checks whether a port is initiailzed in NAS-QoS module
+ * @Param   switch_id
+ * @Param   port_id : i.e. ifindex
+ * @Return  true if it is initialized; false otherwise
+ */
+bool nas_qos_port_is_initialized(uint32_t switch_id, hal_ifindex_t port_id)
+{
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                     "switch_id %u cannot be found/created",
+                     switch_id);
+        return false;
+    }
+
+    return p_switch->port_is_initialized(port_id);
+}

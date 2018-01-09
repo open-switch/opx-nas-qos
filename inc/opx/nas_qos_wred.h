@@ -26,13 +26,11 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
+#include "nas_ndi_qos.h"
 
 class nas_qos_switch;
 
@@ -54,7 +52,7 @@ class nas_qos_wred : public nas::base_obj_t
 
 public:
 
-    nas_qos_wred (nas_qos_switch* switch_p);
+    nas_qos_wred (nas_qos_switch* p_switch);
 
     const nas_qos_switch& get_switch() ;
 

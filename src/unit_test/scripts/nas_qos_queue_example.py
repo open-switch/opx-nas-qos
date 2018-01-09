@@ -18,6 +18,24 @@ import nas_qos
 import nas_qos_buffer_pool_example
 import nas_qos_buffer_profile_example
 
+
+import sys
+import nas_os_if_utils
+import ifindex_utils
+
+def get_first_phy_port():
+    ret_data_list = nas_os_if_utils.nas_os_if_list()
+    if not ret_data_list:
+        return None
+    name_list = []
+    for ret_data in ret_data_list:
+        cps_obj = cps_utils.CPSObject(obj=ret_data)
+        port_name = cps_obj.get_attr_data('if/interfaces/interface/name')
+        name_list.append(port_name)
+    name_list.sort()
+    return name_list[0]
+
+
 def queue_get_example(port_id, queue_type, queue_number):
     return_data_list = []
 
@@ -201,7 +219,12 @@ def queue_modify_buffer_profile_example(
     return ret_cps_data
 
 if __name__ == '__main__':
-    port_id = 17
+    if len(sys.argv) >= 2:
+        port_name = sys.argv[1]
+    else:
+        port_name = get_first_phy_port()
+
+    port_id = ifindex_utils.if_nametoindex(port_name)
 
     print '### Show all queues of port %d ###' % port_id
     queue_get_example(port_id, None, None)

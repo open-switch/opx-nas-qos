@@ -26,10 +26,9 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
+#include "dell-base-qos.h"
 #include "nas_base_obj.h"
 #include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
@@ -68,9 +67,14 @@ class nas_qos_priority_group : public nas::base_obj_t
     // managed by this NAS component
     ndi_obj_id_map_t          _ndi_obj_ids;
 
+    // list of shadow priority group ids on all different MMUs
+    // If the priority group does not exist in a particular MMU,
+    // NULL_OBJECT_ID will be stored at that MMU location.
+    std::vector<ndi_obj_id_t> _shadow_ndi_obj_id_list;
+
 public:
 
-    nas_qos_priority_group (nas_qos_switch* switch_p, nas_qos_priority_group_key_t key);
+    nas_qos_priority_group (nas_qos_switch* p_switch, nas_qos_priority_group_key_t key);
 
     const nas_qos_switch& get_switch() ;
 
@@ -112,11 +116,24 @@ public:
     void set_ndi_obj_id (ndi_obj_id_t obj_id);
     void reset_ndi_obj_id ();
 
+    void reset_shadow_pg_ids() {_shadow_ndi_obj_id_list.clear();}
+    void add_shadow_pg_id(ndi_obj_id_t id) {_shadow_ndi_obj_id_list.push_back(id);}
+    uint_t get_shadow_pg_count() {return _shadow_ndi_obj_id_list.size();}
+    ndi_obj_id_t get_shadow_pg_id(uint_t nas_mmu_idx) {
+        uint_t ndi_mmu_idx = nas_mmu_idx - 1;
+        if (ndi_mmu_idx < _shadow_ndi_obj_id_list.size())
+            return _shadow_ndi_obj_id_list[ndi_mmu_idx];
+        else
+            return NDI_QOS_NULL_OBJECT_ID;
+    }
 } ;
 
 inline ndi_obj_id_t nas_qos_priority_group::ndi_obj_id () const
 {
-    return (_ndi_obj_ids.at (ndi_port_id.npu_id));
+    if (is_created_in_ndi())
+        return (_ndi_obj_ids.at (ndi_port_id.npu_id));
+    else
+        return NDI_QOS_NULL_OBJECT_ID;
 }
 
 inline void nas_qos_priority_group::set_ndi_obj_id (ndi_obj_id_t id)

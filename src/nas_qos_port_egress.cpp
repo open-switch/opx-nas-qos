@@ -16,19 +16,18 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_port_egress.h"
 #include "dell-base-qos.h"
-#include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_port_egress::nas_qos_port_egress (nas_qos_switch* switch_p,
+nas_qos_port_egress::nas_qos_port_egress (nas_qos_switch* p_switch,
                             hal_ifindex_t port)
-           : base_obj_t(switch_p), port_id(port)
+           : base_obj_t(p_switch), port_id(port)
 {
     memset(&cfg, 0, sizeof(cfg));
     ndi_port_id = {0}; // for coverity check only
+    num_ucast_queue = 0;
+    num_mcast_queue = 0;
 }
 
 nas_qos_switch& nas_qos_port_egress::get_switch()
@@ -61,7 +60,7 @@ bool nas_qos_port_egress::push_delete_obj_to_npu (npu_id_t npu_id)
 
 bool nas_qos_port_egress::is_leaf_attr (nas_attr_id_t attr_id)
 {
-    // Table of function pointers to handle modify of Qos port ingress
+    // Table of function pointers to handle modify of Qos port egress
     // attributes.
     static const std::unordered_map <BASE_QOS_PORT_EGRESS_t,
                                      bool,
@@ -71,16 +70,13 @@ bool nas_qos_port_egress::is_leaf_attr (nas_attr_id_t attr_id)
         // modifiable objects
         {BASE_QOS_PORT_EGRESS_WRED_PROFILE_ID,          true},
         {BASE_QOS_PORT_EGRESS_SCHEDULER_PROFILE_ID,     true},
-        {BASE_QOS_PORT_EGRESS_NUM_UNICAST_QUEUE,        true},
-        {BASE_QOS_PORT_EGRESS_NUM_MULTICAST_QUEUE,      true},
-        {BASE_QOS_PORT_EGRESS_NUM_QUEUE,                true},
         {BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP,          true},
         {BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP,          true},
         {BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP,           true},
         {BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DOT1P_MAP,    true},
         {BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DSCP_MAP,     true},
         {BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP,true},
-        {BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST,      true},
+        {BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST,   true},
     };
 
     return (_leaf_attr_map.at(static_cast<BASE_QOS_PORT_EGRESS_t>(attr_id)));
@@ -110,15 +106,6 @@ bool nas_qos_port_egress::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
     case BASE_QOS_PORT_EGRESS_SCHEDULER_PROFILE_ID:
         ndi_cfg.scheduler_profile_id = nas_switch.nas2ndi_scheduler_profile_id(
                                                     get_scheduler_profile_id(), npu_id);
-        break;
-    case BASE_QOS_PORT_EGRESS_NUM_UNICAST_QUEUE:
-        ndi_cfg.num_ucast_queue = get_num_unicast_queue();
-        break;
-    case BASE_QOS_PORT_EGRESS_NUM_MULTICAST_QUEUE:
-        ndi_cfg.num_mcast_queue = get_num_multicast_queue();
-        break;
-    case BASE_QOS_PORT_EGRESS_NUM_QUEUE:
-        ndi_cfg.num_queue = get_num_queue();
         break;
     case BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP:
         ndi_cfg.tc_to_queue_map = nas_switch.nas2ndi_map_id(get_tc_to_queue_map(), npu_id);

@@ -26,10 +26,8 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
 #include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
@@ -56,7 +54,7 @@ class nas_qos_scheduler : public nas::base_obj_t
 
 public:
 
-    nas_qos_scheduler (nas_qos_switch* switch_p);
+    nas_qos_scheduler (nas_qos_switch* p_switch);
 
     const nas_qos_switch& get_switch() ;
 
@@ -135,6 +133,10 @@ inline void nas_qos_scheduler::set_algorithm(BASE_QOS_SCHEDULING_TYPE_t val)
 {
     mark_attr_dirty(BASE_QOS_SCHEDULER_PROFILE_ALGORITHM);
     cfg.algorithm = val;
+
+    // For SP, reset previous weight settings in NAS
+    if (val == BASE_QOS_SCHEDULING_TYPE_SP)
+        cfg.weight = 0;
 }
 
 inline void nas_qos_scheduler::set_weight(uint32_t val)

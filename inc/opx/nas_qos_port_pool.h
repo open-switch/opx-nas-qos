@@ -17,12 +17,9 @@
 #ifndef _NAS_QOS_PORT_POOL_H_
 #define _NAS_QOS_PORT_POOL_H_
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
 #include "nas_ndi_obj_id_table.h"
 
@@ -45,7 +42,7 @@ typedef struct qos_port_pool_struct_t {
     nas_obj_id_t     wred_id;
 
     // stats: TODO
-} qos_port_pool_struct_t;
+} nas_qos_port_pool_struct_t;
 
 class nas_qos_port_pool : public nas::base_obj_t
 {
@@ -53,7 +50,7 @@ class nas_qos_port_pool : public nas::base_obj_t
     nas_qos_port_pool_key_t key;
 
     // attributes
-    qos_port_pool_struct_t cfg;
+    nas_qos_port_pool_struct_t cfg;
 
     // cached info
     ndi_port_t      ndi_port_id; // derived from nas_queue_key.port_id, i.e. ifIndex
@@ -63,7 +60,7 @@ class nas_qos_port_pool : public nas::base_obj_t
     nas::ndi_obj_id_table_t        _ndi_obj_ids;
 
 public:
-    nas_qos_port_pool(nas_qos_switch* switch_p, hal_ifindex_t port_id, nas_obj_id_t pool_id);
+    nas_qos_port_pool(nas_qos_switch* p_switch, hal_ifindex_t port_id, nas_obj_id_t pool_id);
 
     nas_qos_switch& get_switch();
 
@@ -76,7 +73,7 @@ public:
     nas_obj_id_t get_pool_id() const { return key.pool_id; }
     void set_pool_id(nas_obj_id_t id) { key.pool_id = id; }
 
-    ndi_obj_id_t get_wred_profile_id() const { return cfg.wred_id; }
+    nas_obj_id_t get_wred_profile_id() const { return cfg.wred_id; }
     void set_wred_profile_id(nas_obj_id_t id) { cfg.wred_id = id; }
 
 

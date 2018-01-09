@@ -25,12 +25,10 @@
 #define _NAS_QOS_MAP_ENTRY_H_
 
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
+#include "dell-base-qos.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
 
 #include <unordered_map>
@@ -51,7 +49,7 @@ class nas_qos_map_entry : public nas::base_obj_t
 
 public:
 
-    nas_qos_map_entry (nas_qos_switch* switch_p,
+    nas_qos_map_entry (nas_qos_switch* p_switch,
                         nas_obj_id_t map_id,
                         nas_qos_map_type_t type,
                         nas_qos_map_entry_key_t key);

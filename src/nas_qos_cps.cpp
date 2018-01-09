@@ -227,8 +227,8 @@ cps_api_return_code_t nas_qos_cps_api_write (void * context,
         return nas_qos_cps_api_priority_group_write(context, param, ix);
 
     case BASE_QOS_BUFFER_POOL_STAT_OBJ:
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_BUFFER_POOL_STAT_OBJ, not supported");
-        return NAS_QOS_E_UNSUPPORTED;
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_BUFFER_POOL_STAT_OBJ");
+        return nas_qos_cps_api_buffer_pool_stat_clear(context, param, ix);
 
     case BASE_QOS_PRIORITY_GROUP_STAT_OBJ:
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PRIORITY_GROUP_STAT_OBJ");

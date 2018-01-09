@@ -22,20 +22,16 @@
  */
 
 #include "event_log.h"
-#include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_map.h"
 #include "nas_qos_map_entry.h"
-#include "dell-base-qos.h"
 #include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_map_entry::nas_qos_map_entry (nas_qos_switch* switch_p,
+nas_qos_map_entry::nas_qos_map_entry (nas_qos_switch* p_switch,
         nas_obj_id_t map_id,
         nas_qos_map_type_t type,
         nas_qos_map_entry_key_t key)
-           : base_obj_t (switch_p), map_id(map_id), type(type), key(key)
+           : base_obj_t (p_switch), map_id(map_id), type(type), key(key)
 {
     value = {0};
 }
@@ -283,8 +279,8 @@ t_std_error nas_qos_map_entry::get_ndi_qid(ndi_obj_id_t &ndi_qid)
         break;
 
     case BASE_QOS_QUEUE_TYPE_MULTICAST:
-    {   nas_qos_switch & switch_p = const_cast <nas_qos_switch &> (get_switch());
-        ndi_qid = (get_value().queue_num + switch_p.ucast_queues_per_port);
+    {   nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
+        ndi_qid = (get_value().queue_num + p_switch.ucast_queues_per_port);
     }
     break;
 
@@ -308,8 +304,8 @@ t_std_error nas_qos_map_entry::get_ndi_default_qid(ndi_obj_id_t &ndi_qid)
         break;
 
     case BASE_QOS_QUEUE_TYPE_MULTICAST:
-    {   nas_qos_switch & switch_p = const_cast <nas_qos_switch &> (get_switch());
-        ndi_qid = switch_p.ucast_queues_per_port;
+    {   nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
+        ndi_qid = p_switch.ucast_queues_per_port;
     }
     break;
 
@@ -322,13 +318,13 @@ t_std_error nas_qos_map_entry::get_ndi_default_qid(ndi_obj_id_t &ndi_qid)
 
 t_std_error  nas_qos_map_entry::get_ndi_map_id(npu_id_t npu_id, ndi_obj_id_t * ndi_map_id)
 {
-    nas_qos_switch & switch_p = const_cast <nas_qos_switch &> (get_switch());
+    nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
 
     try {
-        if (switch_p.get_map(map_id) == NULL)
+        if (p_switch.get_map(map_id) == NULL)
             return STD_ERR(QOS, CFG, 0);
 
-        *ndi_map_id = switch_p.get_map(map_id)->ndi_obj_id(npu_id);
+        *ndi_map_id = p_switch.get_map(map_id)->ndi_obj_id(npu_id);
     }
     catch (...) {
         return STD_ERR(QOS, CFG, 0);

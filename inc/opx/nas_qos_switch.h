@@ -42,6 +42,7 @@
 #include <unordered_map>
 #include <map>
 #include <mutex>
+#include <vector>
 
 typedef std::unordered_map<nas_obj_id_t, nas_qos_policer> policer_list_t;
 typedef policer_list_t::iterator policer_iter_t;
@@ -153,6 +154,10 @@ class nas_qos_switch : public nas::base_switch_t
 
     /************* Port Pools **************************************/
     port_pool_list_t port_pools;
+
+    // list of ports that are initialized in nas-qos
+    std::set<hal_ifindex_t> initialized_port_list;
+
 public:
 
     mutable std::recursive_mutex mtx;
@@ -162,6 +167,7 @@ public:
         mcast_queues_per_port = 0;
         total_queues_per_port = 0;
         cpu_queues = 0;
+        max_sched_group_level = 0;
     };
 
     // switch wide info
@@ -169,6 +175,7 @@ public:
     uint_t mcast_queues_per_port;
     uint_t total_queues_per_port;
     uint_t cpu_queues;
+    uint_t max_sched_group_level;
 
     /************** Policers ***************/
 
@@ -213,12 +220,17 @@ public:
     void release_queue_id(nas_obj_id_t id) {_queue_id_gen.release_id((id & (~NAS_QUEUE_ID_TYPE_MASK)));}
 
     bool            is_queue_id_obj(nas_obj_id_t id) {return ((id & NAS_QUEUE_ID_TYPE_MASK)? true: false);}
-    void            dump_all_queues();
+    void            dump_all_queues(hal_ifindex_t port_id);
 
     // return the actual number of queues filled
     uint_t    get_port_queues(hal_ifindex_t port_id, uint_t count, nas_qos_queue * q_list[]);
     uint_t    get_number_of_port_queues(hal_ifindex_t port_id);
+    uint_t    get_number_of_port_queues_by_type(hal_ifindex_t port_id, BASE_QOS_QUEUE_TYPE_t type);
     bool      port_queue_is_initialized(hal_ifindex_t port_id);
+
+    // Return number of nas_q_ids of the port_id;
+    // q_id_list[count] will be filled with nas_q_id
+    uint_t    get_port_queue_ids(hal_ifindex_t port_id, uint_t count, nas_obj_id_t *q_id_list);
 
     // handler upon port deletion
     bool      delete_queue_by_ifindex(hal_ifindex_t port_id);
@@ -317,6 +329,10 @@ public:
     uint_t    get_port_priority_groups(hal_ifindex_t port_id, uint_t count, nas_qos_priority_group * q_list[]);
     uint_t    get_number_of_port_priority_groups(hal_ifindex_t port_id);
     bool      port_priority_group_is_initialized(hal_ifindex_t port_id);
+    // Return number of nas_pg_ids of the port_id;
+    // pg_id_list[count] will be filled with nas_pg_id
+    uint_t    get_port_pg_ids(hal_ifindex_t port_id, uint_t count, nas_obj_id_t *pg_id_list);
+
 
     bool      delete_pg_by_ifindex(hal_ifindex_t port_id);
 
@@ -360,6 +376,23 @@ public:
     ndi_obj_id_t nas2ndi_buffer_profile_id(nas_obj_id_t id, npu_id_t npu_id);
     ndi_obj_id_t nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_id);
     ndi_obj_id_t nas2ndi_policer_id(nas_obj_id_t policer_id, npu_id_t npu_id);
+
+    nas_obj_id_t ndi2nas_wred_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id);
+    nas_obj_id_t ndi2nas_map_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id);
+    nas_obj_id_t ndi2nas_scheduler_profile_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id);
+    nas_obj_id_t ndi2nas_buffer_profile_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id);
+    nas_obj_id_t ndi2nas_policer_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id);
+    nas_obj_id_t ndi2nas_queue_id(ndi_obj_id_t ndi_obj_id);
+    nas_obj_id_t ndi2nas_scheduler_group_id(ndi_obj_id_t ndi_obj_id);
+    nas_obj_id_t ndi2nas_priority_group_id(ndi_obj_id_t ndi_obj_id);
+
+    bool port_is_initialized(hal_ifindex_t port_id);
+    void add_initialized_port(hal_ifindex_t port_id) {
+        initialized_port_list.insert(port_id);
+    };
+    void del_initialized_port(hal_ifindex_t port_id) {
+        initialized_port_list.erase(port_id);
+    }
 
 };
 #endif

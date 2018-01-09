@@ -14,10 +14,10 @@
  * permissions and limitations under the License.
  */
 
-#include "cps_api_events.h"
 #include "cps_api_operation.h"
 #include "cps_api_object_key.h"
 #include "cps_class_map.h"
+#include "cps_api_db_interface.h"
 
 #include "event_log_types.h"
 #include "event_log.h"
@@ -31,6 +31,8 @@
 #include "cps_api_key.h"
 #include "dell-base-qos.h"
 #include "nas_qos_port_pool.h"
+#include "nas_if_utils.h"
+#include <vector>
 
 static std_mutex_lock_create_static_init_rec(port_pool_mutex);
 static cps_api_return_code_t nas_qos_cps_api_port_pool_create(
@@ -48,9 +50,6 @@ static cps_api_return_code_t _append_one_port_pool(cps_api_get_params_t * param,
 static nas_qos_port_pool * nas_qos_cps_get_port_pool(uint_t switch_id,
                                            uint_t port_id,
                                            nas_obj_id_t pool_id);
-
-static uint64_t get_stats_by_type(const nas_qos_port_pool_stat_counter_t *p,
-                                BASE_QOS_PORT_POOL_STAT_t id);
 
 static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
                                                 nas_qos_port_pool& port_pool)
@@ -197,7 +196,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_read(void * context,
         return cps_api_ret_code_ERR;
     }
 
-    uint_t port_id = (port_id_attr? cps_api_object_attr_data_u32(port_id_attr): 0);
+    uint_t port_id = cps_api_object_attr_data_u32(port_id_attr);
 
     cps_api_object_attr_t pool_id_attr = cps_api_get_key_data(obj, BASE_QOS_PORT_POOL_BUFFER_POOL_ID);
 
@@ -335,7 +334,9 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_create(
         return rc;
 
     try {
-        port_pool.commit_create(sav_obj? false: true);
+        if (!nas_is_virtual_port(port_id)) {
+            port_pool.commit_create(sav_obj? false: true);
+        }
 
         p_switch->add_port_pool(port_pool);
 
@@ -357,6 +358,11 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_create(
                  return cps_api_ret_code_ERR;
             }
             cps_api_object_clone(tmp_obj, obj);
+        }
+
+        // update DB
+        if (cps_api_db_commit_one(cps_api_oper_CREATE, obj, nullptr, false) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Fail to store port pool update to DB");
         }
 
     } catch (nas::base_exception & e) {
@@ -384,7 +390,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_set(
     nas_obj_id_t pool_id = 0;
     cps_api_return_code_t rc = cps_api_ret_code_OK;
 
-    if ((rc = port_pool_get_key(obj, switch_id, port_id, pool_id))
+   if ((rc = port_pool_get_key(obj, switch_id, port_id, pool_id))
             !=    cps_api_ret_code_OK)
         return rc;
 
@@ -405,28 +411,33 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_set(
     try {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying port_pool: port_id attr \n");
 
-        nas::attr_set_t modified_attr_list = port_pool.commit_modify(
-                                        *port_pool_p, (sav_obj? false: true));
+        if (!nas_is_virtual_port(port_id)) {
+            nas::attr_set_t modified_attr_list = port_pool.commit_modify(
+                                            *port_pool_p, (sav_obj? false: true));
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
 
+            // set attribute with full copy
+            // save rollback info if caller requests it.
+            // use modified attr list, current port_pool value
+            if (sav_obj) {
+                cps_api_object_t tmp_obj;
+                tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
+                if (tmp_obj == NULL) {
+                    return cps_api_ret_code_ERR;
+                }
 
-        // set attribute with full copy
-        // save rollback info if caller requests it.
-        // use modified attr list, current port_pool value
-        if (sav_obj) {
-            cps_api_object_t tmp_obj;
-            tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
-            if (tmp_obj == NULL) {
-                return cps_api_ret_code_ERR;
+                nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *port_pool_p);
             }
-
-            nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *port_pool_p);
-
-       }
+        }
 
         // update the local cache with newly set values
         *port_pool_p = port_pool;
+
+        // update DB
+        if (cps_api_db_commit_one(cps_api_oper_SET, obj, nullptr, false) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Fail to store port pool update to DB");
+        }
 
     } catch (nas::base_exception & e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -478,7 +489,9 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_delete(
 
     // delete
     try {
-        port_pool_p->commit_delete(sav_obj? false: true);
+        if (!nas_is_virtual_port(port_id)) {
+            port_pool_p->commit_delete(sav_obj? false: true);
+        }
 
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted port_pool\n");
 
@@ -493,6 +506,11 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_delete(
         }
 
         p_switch->remove_port_pool(port_id, pool_id);
+
+        // update DB
+        if (cps_api_db_commit_one(cps_api_oper_DELETE, obj, nullptr, false) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Fail to store port pool update to DB");
+        }
 
     } catch (nas::base_exception & e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -523,82 +541,55 @@ static nas_qos_port_pool * nas_qos_cps_get_port_pool(uint_t switch_id,
     return port_pool_p;
 }
 
-static uint64_t _get_green_discard_dropped_packets (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->green_discard_dropped_packets ;
-}
-static uint64_t _get_green_discard_dropped_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->green_discard_dropped_bytes ;
-}
-static uint64_t _get_yellow_discard_dropped_packets (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->yellow_discard_dropped_packets ;
-}
-static uint64_t _get_yellow_discard_dropped_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->yellow_discard_dropped_bytes ;
-}
-static uint64_t _get_red_discard_dropped_packets (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->red_discard_dropped_packets ;
-}
-static uint64_t _get_red_discard_dropped_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->red_discard_dropped_bytes ;
-}
-static uint64_t _get_discard_dropped_packets (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->discard_dropped_packets ;
-}
-static uint64_t _get_discard_dropped_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->discard_dropped_bytes ;
-}
-static uint64_t _get_current_occupancy_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->current_occupancy_bytes ;
-}
-static uint64_t _get_watermark_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->watermark_bytes ;
-}
-static uint64_t _get_shared_current_occupancy_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->shared_current_occupancy_bytes ;
-}
-static uint64_t _get_shared_watermark_bytes (const nas_qos_port_pool_stat_counter_t *p) {
-    return p->shared_watermark_bytes ;
-}
 
-typedef uint64_t (*_stat_get_fn) (const nas_qos_port_pool_stat_counter_t *p);
-
-typedef struct _stat_attr_list_t {
-    bool            read_ok;
-    bool            write_ok;
-    _stat_get_fn    fn;
-}_stat_attr_list;
-
-static bool _port_pool_stat_attr_get(nas_attr_id_t attr_id, _stat_attr_list * p_stat_attr)
+static bool _port_pool_stat_attr_get(nas_attr_id_t attr_id, stat_attr_capability * p_stat_attr)
 {
 
     static const auto &  _port_pool_attr_map =
-            * new std::unordered_map<nas_attr_id_t, _stat_attr_list, std::hash<int>>
+            * new std::unordered_map<nas_attr_id_t, stat_attr_capability, std::hash<int>>
     {
 
         {BASE_QOS_PORT_POOL_STAT_GREEN_DISCARD_DROPPED_PACKETS,
-                {true, true, _get_green_discard_dropped_packets}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_GREEN_DISCARD_DROPPED_BYTES,
-                {true, true, _get_green_discard_dropped_bytes}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_YELLOW_DISCARD_DROPPED_PACKETS,
-                {true, true, _get_yellow_discard_dropped_packets}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_YELLOW_DISCARD_DROPPED_BYTES,
-                {true, true, _get_yellow_discard_dropped_bytes}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_RED_DISCARD_DROPPED_PACKETS,
-                {true, true, _get_red_discard_dropped_packets}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_RED_DISCARD_DROPPED_BYTES,
-                {true, true, _get_red_discard_dropped_bytes}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_DISCARD_DROPPED_PACKETS,
-                {true, true, _get_discard_dropped_packets}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_DISCARD_DROPPED_BYTES,
-                {true, true, _get_discard_dropped_bytes}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_CURRENT_OCCUPANCY_BYTES,
-                {true, false, _get_current_occupancy_bytes}},
+                {true, false}},
         {BASE_QOS_PORT_POOL_STAT_WATERMARK_BYTES,
-                {true, true, _get_watermark_bytes}},
+                {true, true}},
         {BASE_QOS_PORT_POOL_STAT_SHARED_CURRENT_OCCUPANCY_BYTES,
-                {true, false, _get_shared_current_occupancy_bytes}},
+                {true, false}},
         {BASE_QOS_PORT_POOL_STAT_SHARED_WATERMARK_BYTES,
-                {true, true, _get_shared_watermark_bytes}},
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_GREEN_WRED_ECN_MARKED_PACKETS,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_GREEN_WRED_ECN_MARKED_BYTES,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_YELLOW_WRED_ECN_MARKED_PACKETS,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_YELLOW_WRED_ECN_MARKED_BYTES,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_RED_WRED_ECN_MARKED_PACKETS,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_RED_WRED_ECN_MARKED_BYTES,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_WRED_ECN_MARKED_PACKETS,
+                {true, true}},
+        {BASE_QOS_PORT_POOL_STAT_WRED_ECN_MARKED_BYTES,
+                {true, true}},
+
        };
 
     try {
@@ -610,16 +601,6 @@ static bool _port_pool_stat_attr_get(nas_attr_id_t attr_id, _stat_attr_list * p_
     return true;
 }
 
-
-static uint64_t get_stats_by_type(const nas_qos_port_pool_stat_counter_t *p,
-                                BASE_QOS_PORT_POOL_STAT_t id)
-{
-    _stat_attr_list stat_attr;
-    if (_port_pool_stat_attr_get(id, &stat_attr) != true)
-        return 0;
-
-    return stat_attr.fn(p);
-}
 
 
 /**
@@ -647,25 +628,27 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
     key.port_id = cps_api_object_attr_data_u32(port_id_attr);
     key.pool_id = cps_api_object_attr_data_u64(pool_id_attr);
 
+    if (nas_is_virtual_port(key.port_id))
+        return NAS_QOS_E_FAIL;
+
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
             "Read switch id %u, port_id %u pool_id %u stat\n",
             switch_id, key.port_id, key.pool_id);
 
     std_mutex_simple_lock_guard p_m(&port_pool_mutex);
 
-    nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
-    if (switch_p == NULL) {
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    nas_qos_port_pool * port_pool_p = switch_p->get_port_pool(key.port_id, key.pool_id);
+    nas_qos_port_pool * port_pool_p = p_switch->get_port_pool(key.port_id, key.pool_id);
     if (port_pool_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Port Pool not found");
         return NAS_QOS_E_FAIL;
     }
 
-    nas_qos_port_pool_stat_counter_t stats = {0};
     std::vector<BASE_QOS_PORT_POOL_STAT_t> counter_ids;
 
     cps_api_object_it_t it;
@@ -676,7 +659,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
             id == BASE_QOS_PORT_POOL_STAT_BUFFER_POOL_ID)
             continue; //key
 
-        _stat_attr_list stat_attr;
+        stat_attr_capability stat_attr;
         if (_port_pool_stat_attr_get(id, &stat_attr) != true) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %u, ignored", id);
             continue;
@@ -687,12 +670,19 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
         }
     }
 
+    if (counter_ids.size() == 0) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "port pool stats get without any valid counter ids");
+        return NAS_QOS_E_FAIL;
+    }
+
+    std::vector<uint64_t> counters(counter_ids.size());
+
     ndi_port_t ndi_port = port_pool_p->get_ndi_port_id();
-    if (ndi_qos_get_port_pool_stats(ndi_port,
+    if (ndi_qos_get_port_pool_statistics(ndi_port,
                                 port_pool_p->ndi_obj_id(),
                                 &counter_ids[0],
                                 counter_ids.size(),
-                                &stats) != STD_ERR_OK) {
+                                &counters[0]) != STD_ERR_OK) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "port pool stats get failed");
         return NAS_QOS_E_FAIL;
     }
@@ -713,11 +703,8 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
             cps_api_object_ATTR_T_U64,
             &(key.pool_id), sizeof(uint64_t));
 
-    uint64_t val64;
     for (uint_t i=0; i< counter_ids.size(); i++) {
-        BASE_QOS_PORT_POOL_STAT_t id = counter_ids[i];
-        val64 = get_stats_by_type(&stats, id);
-        cps_api_object_attr_add_u64(ret_obj, id, val64);
+        cps_api_object_attr_add_u64(ret_obj, counter_ids[i], counters[i]);
     }
 
     return  cps_api_ret_code_OK;
@@ -756,19 +743,22 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
     key.port_id = cps_api_object_attr_data_u32(port_id_attr);
     key.pool_id = cps_api_object_attr_data_u64(pool_id_attr);
 
+    if (nas_is_virtual_port(key.port_id))
+        return NAS_QOS_E_FAIL;
+
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
             "Read switch id %u, port_id %u pool_id %u stat\n",
             switch_id, key.port_id, key.pool_id);
 
     std_mutex_simple_lock_guard p_m(&port_pool_mutex);
 
-    nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
-    if (switch_p == NULL) {
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    nas_qos_port_pool * port_pool_p = switch_p->get_port_pool(key.port_id, key.pool_id);
+    nas_qos_port_pool * port_pool_p = p_switch->get_port_pool(key.port_id, key.pool_id);
     if (port_pool_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "port pool not found");
         return NAS_QOS_E_FAIL;
@@ -784,7 +774,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
             id == BASE_QOS_PORT_POOL_STAT_BUFFER_POOL_ID)
             continue; //key
 
-        _stat_attr_list stat_attr;
+        stat_attr_capability stat_attr;
         if (_port_pool_stat_attr_get(id, &stat_attr) != true) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %u, ignored", id);
             continue;
@@ -793,6 +783,11 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
         if (stat_attr.write_ok) {
             counter_ids.push_back((BASE_QOS_PORT_POOL_STAT_t)id);
         }
+    }
+
+    if (counter_ids.size() == 0) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "port pool stats clear without any valid counter ids");
+        return NAS_QOS_E_FAIL;
     }
 
     ndi_port_t ndi_port = port_pool_p->get_ndi_port_id();
@@ -808,3 +803,95 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
     return  cps_api_ret_code_OK;
 
 }
+
+/*
+ * This function handles the ifindex to NPU-Port association,
+ * pushing the saved DB configuration to npu.
+ * @Param ifindex
+ * @Param ndi_port
+ * @Param isAdd: true if establishing a physical port association
+ *               false if dissolve the virtual port to physical port association
+ * @Return
+ */
+void nas_qos_port_pool_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd)
+{
+
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS-Port-Pool",
+                     "switch_id cannot be found with npu_id %d",
+                     ndi_port_id.npu_id);
+        return ;
+    }
+
+    std::vector<nas_qos_port_pool *> port_pool_list;
+
+    // Find the matching port pools under ifindex
+    port_pool_iter_t it = p_switch->get_port_pool_it_begin();
+    for ( ; it != p_switch->get_port_pool_it_end(); it++) {
+        if (it->second.get_port_id() == ifindex) {
+            port_pool_list.push_back(&(it->second));
+        }
+    }
+
+    if (isAdd == false) {
+        EV_LOGGING(QOS, NOTICE, "QOS-Port-Pool", "Disassociation ifindex %d from port %d",
+                    ifindex, ndi_port_id.npu_port);
+
+        // Remove Port Pools from NPU only
+        for (auto port_pool: port_pool_list) {
+            port_pool->push_delete_obj_to_npu(ndi_port_id.npu_id);
+            port_pool->reset_ndi_obj_id();
+            port_pool->clear_all_dirty_flags();
+            port_pool->reset_npus();
+            port_pool->mark_ndi_removed();
+        }
+
+        return;
+    }
+    else {
+        EV_LOGGING(QOS, NOTICE, "QOS-Port-Pool", "Association ifindex %d to npu port %d",
+                ifindex, ndi_port_id.npu_port);
+
+        // update npu mapping
+        for (auto port_pool: port_pool_list) {
+            port_pool->set_ndi_port_id(ndi_port_id.npu_id, ndi_port_id.npu_port);
+            port_pool->add_npu(ndi_port_id.npu_id);
+            port_pool->mark_ndi_created();
+        }
+
+        // read DB and push to NPU
+        cps_api_object_guard _og(cps_api_object_create());
+        if(!_og.valid()){
+            EV_LOGGING(QOS,ERR,"QOS-DB-GET","Failed to create object for db get");
+            return;
+        }
+
+        cps_api_key_from_attr_with_qual(cps_api_object_key(_og.get()),
+                BASE_QOS_PORT_POOL_OBJ,
+                cps_api_qualifier_TARGET);
+        cps_api_set_key_data(_og.get(), BASE_QOS_PORT_POOL_PORT_ID,
+                cps_api_object_ATTR_T_U32,
+                &ifindex, sizeof(uint32_t));
+        cps_api_object_list_guard lst(cps_api_object_list_create());
+        if (cps_api_db_get(_og.get(),lst.get())==cps_api_ret_code_OK) {
+            size_t len = cps_api_object_list_size(lst.get());
+
+            for (uint idx=0; idx< len; idx++) {
+
+                cps_api_object_t db_obj = cps_api_object_list_get(lst.get(), idx);
+
+                cps_api_key_set_attr(cps_api_object_key(db_obj), cps_api_oper_SET);
+
+                // push the DB to NPU
+                nas_qos_cps_api_port_pool_set(db_obj, NULL);
+
+                EV_LOGGING(QOS, NOTICE,"QOS-Port-Pool",
+                        "One Port Pool DB record for port %d written to NPU",
+                        ifindex);
+            }
+        }
+        return;
+    }
+}
+

@@ -71,4 +71,25 @@ bool nas_qos_get_port_intf(uint_t ifindex, interface_ctrl_t *intf_ctrl);
  */
 void nas_qos_if_delete_notify(uint_t ifindex);
 
+/*
+ *  This function initializes interface related data structure
+ *  @Param ifindex
+ *  @return
+ *
+ */
+void nas_qos_if_create_notify(uint_t ifindex);
+
+/*
+ *  This function handles interface SET notification
+ *  within NAS-QoS.
+ *
+ *  @Param ifindex
+ *  @Param ndi_port
+ *  @Param isAdd: True: ifindex is associated to a new ndi_port
+ *                False: ifindex is disassociated from the ndi_port
+ *  @return
+ *
+ */
+void nas_qos_if_set_notify(uint_t ifindex, ndi_port_t ndi_port, bool isAdd);
+
 #endif

@@ -23,16 +23,13 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_policer.h"
 #include "dell-base-qos.h"
-#include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 #include <inttypes.h>
 
-nas_qos_policer::nas_qos_policer (nas_qos_switch* switch_p)
-           : base_obj_t (switch_p)
+nas_qos_policer::nas_qos_policer (nas_qos_switch* p_switch)
+           : base_obj_t (p_switch)
 {
     memset(&cfg, 0, sizeof(cfg));
 }

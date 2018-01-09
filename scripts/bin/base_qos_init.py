@@ -516,26 +516,23 @@ def get_port_queue_id(ifidx, queue_type, q_num, ifname):
     return queue_id
 
 
-def wait_for_register():
-    ifidx = get_one_interface()
-    time.sleep(1)
-
-    p = nas_qos.IngPortCPSObj(ifindex=ifidx)
-    r = []
-
-    while cps.get([p.data()], r) == False:
-        time.sleep(1)
-
-
 def get_one_interface():
-    ifs = nas_os_if_utils.nas_os_if_list()
-    while not ifs:
+    while True:
         ifs = nas_os_if_utils.nas_os_if_list()
+        if not ifs:
+            time.sleep(1)
+            continue;
+
+        for intf in ifs:
+            obj = cps_object.CPSObject(obj=intf)
+            ifidx = obj.get_attr_data('dell-base-if-cmn/if/interfaces/interface/if-index')
+            p = nas_qos.IngPortCPSObj(ifindex=ifidx)
+            r = []
+
+            if cps.get([p.data()], r) == True:
+                return ifidx
+
         time.sleep(1)
-
-    obj = cps_object.CPSObject(obj=ifs[-1])
-    return obj.get_attr_data('dell-base-if-cmn/if/interfaces/interface/if-index')
-
 
 def read_current_buf_prof(lookup_buf_prof):
     buf_prof_obj = nas_qos.BufferProfileCPSObj(buffer_profile_id=0)
@@ -666,7 +663,7 @@ if __name__ == '__main__':
     else:
         qos_cfg_path = target_cfg_path
 
-    wait_for_register()
+    get_one_interface()
 
     xnode_root = ET.parse(get_cfg()).getroot()
 

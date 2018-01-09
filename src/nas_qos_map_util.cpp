@@ -568,7 +568,7 @@ cps_api_return_code_t  qos_map_entry_get_key(cps_api_object_t obj,
             return cps_api_ret_code_ERR;
         }
 
-    } catch (std::out_of_range&) {
+    } catch (std::out_of_range &e) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                     "attribute id for map entry key is not mapped correctly");
         return cps_api_ret_code_ERR;

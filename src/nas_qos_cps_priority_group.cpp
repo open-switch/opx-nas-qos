@@ -21,10 +21,11 @@
  * \author
  */
 
-#include "cps_api_events.h"
+#include "cps_api_key.h"
 #include "cps_api_operation.h"
 #include "cps_api_object_key.h"
 #include "cps_class_map.h"
+#include "cps_api_db_interface.h"
 
 #include "event_log_types.h"
 #include "event_log.h"
@@ -37,9 +38,9 @@
 #include "nas_qos_common.h"
 #include "nas_qos_switch_list.h"
 #include "nas_qos_cps.h"
-#include "cps_api_key.h"
 #include "dell-base-qos.h"
 #include "nas_qos_priority_group.h"
+#include "nas_if_utils.h"
 
 #include <vector>
 
@@ -52,9 +53,11 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
 static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
                                 cps_api_object_t obj,
                                 cps_api_object_t sav_obj);
-static t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex);
-
 static std_mutex_lock_create_static_init_rec(priority_group_mutex);
+static void nas_qos_port_pg_fetch_from_hw(ndi_port_t ndi_port_id,
+        ndi_obj_id_t ndi_priority_group_id,
+        nas_qos_priority_group * port_pg);
+static t_std_error nas_qos_port_priority_group_init_vp(hal_ifindex_t port_id);
 
 /**
   * This function provides NAS-QoS priority_group CPS API write function
@@ -140,11 +143,16 @@ static cps_api_return_code_t nas_qos_cps_get_priority_group_info(
                 priority_group->get_priority_group_id());
 
         // User configured objects
-        if (priority_group->is_buffer_profile_set())
-            cps_api_object_attr_add_u64(ret_obj,
-                    BASE_QOS_PRIORITY_GROUP_BUFFER_PROFILE_ID,
-                    priority_group->get_buffer_profile());
+        cps_api_object_attr_add_u64(ret_obj,
+                BASE_QOS_PRIORITY_GROUP_BUFFER_PROFILE_ID,
+                priority_group->get_buffer_profile());
 
+        // MMU indexes (1-based in NAS)
+        for (uint_t idx = 0; idx < priority_group->get_shadow_pg_count(); idx++) {
+            uint_t nas_mmu_idx = idx + 1;
+            if (priority_group->get_shadow_pg_id(nas_mmu_idx) != NDI_QOS_NULL_OBJECT_ID)
+                cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PRIORITY_GROUP_MMU_INDEX_LIST, nas_mmu_idx);
+        }
     }
 
     return cps_api_ret_code_OK;
@@ -172,6 +180,10 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_read (void * context,
 
     uint_t port_id = cps_api_object_attr_data_u32(port_id_attr);
 
+    if (!nas_qos_port_is_initialized(switch_id, port_id)) {
+        nas_qos_if_create_notify(port_id);
+    }
+
     bool local_id_specified = false;
     uint8_t local_id = 0;
     if (local_id_attr) {
@@ -183,9 +195,6 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_read (void * context,
                     switch_id, port_id);
 
     std_mutex_simple_lock_guard p_m(&priority_group_mutex);
-
-    // If the port priority group is not initialized yet, initialize it in NAS
-    nas_qos_port_priority_group_init(port_id);
 
     return nas_qos_cps_get_priority_group_info(param, switch_id, port_id,
                                             local_id_specified, local_id);
@@ -235,12 +244,14 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
     uint_t port_id = cps_api_object_attr_data_u32(port_id_attr);
     uint8_t local_id = *(uint8_t *)cps_api_object_attr_data_bin(local_id_attr);
 
+    if (!nas_qos_port_is_initialized(switch_id, port_id)) {
+        nas_qos_if_create_notify(port_id);
+    }
+
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
             "Modify switch id %u, port id %u,  local_id %u \n",
             switch_id, port_id,  local_id);
 
-    // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_priority_group_init(port_id);
 
     nas_qos_priority_group_key_t key;
     key.port_id = port_id;
@@ -278,23 +289,30 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
                 "Modifying switch id %u, port id %u priority_group info \n",
                 switch_id, port_id);
 
-        nas::attr_set_t modified_attr_list = priority_group.commit_modify(
-                                    *priority_group_p, (sav_obj? false: true));
+        if (!nas_is_virtual_port(port_id)) {
+            nas::attr_set_t modified_attr_list = priority_group.commit_modify(
+                                        *priority_group_p, (sav_obj? false: true));
 
 
-        // set attribute with full copy
-        // save rollback info if caller requests it.
-        // use modified attr list, current priority_group value
-        if (sav_obj) {
-            tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
-            if (!tmp_obj) {
-                return cps_api_ret_code_ERR;
+            // set attribute with full copy
+            // save rollback info if caller requests it.
+            // use modified attr list, current priority_group value
+            if (sav_obj) {
+                tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
+                if (!tmp_obj) {
+                    return cps_api_ret_code_ERR;
+                }
+                nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *priority_group_p);
             }
-            nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *priority_group_p);
         }
 
         // update the local cache with newly set values
         *priority_group_p = priority_group;
+
+        // update DB
+        if (cps_api_db_commit_one(cps_api_oper_SET, obj, nullptr, false) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Fail to store PG update to DB");
+        }
 
     } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -390,46 +408,37 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
 
 // create per-port, per-priority_group instance
 static t_std_error create_port_priority_group(hal_ifindex_t port_id,
+                                    ndi_port_t ndi_port_id,
                                     uint8_t local_id,
                                     ndi_obj_id_t ndi_priority_group_id)
 {
-    interface_ctrl_t intf_ctrl;
-
-    if (nas_qos_get_port_intf(port_id, &intf_ctrl) != true) {
-        EV_LOGGING(QOS, NOTICE, "QOS",
-                     "Cannot find NPU id for ifIndex: %d",
-                      port_id);
-        return NAS_QOS_E_FAIL;
-    }
-
-    nas_qos_switch *switch_p = nas_qos_get_switch_by_npu(intf_ctrl.npu_id);
-    if (switch_p == NULL) {
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                      "switch_id of ifindex: %u cannot be found/created",
                      port_id);
         return NAS_QOS_E_FAIL;
     }
-    std::lock_guard<std::recursive_mutex> switch_lg(switch_p->mtx);
 
     try {
         // create the priority_group and add the priority_group to switch
-        nas_obj_id_t priority_group_id = switch_p->alloc_priority_group_id();
+        nas_obj_id_t priority_group_id = p_switch->alloc_priority_group_id();
         nas_qos_priority_group_key_t key;
-        key.port_id = intf_ctrl.if_index;
+        key.port_id = port_id;
         key.local_id = local_id;
-        nas_qos_priority_group pg (switch_p, key);
+        nas_qos_priority_group pg (p_switch, key);
 
         pg.set_priority_group_id(priority_group_id);
-        pg.add_npu(intf_ctrl.npu_id);
-        pg.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
-        pg.set_ndi_obj_id(ndi_priority_group_id);
-        pg.mark_ndi_created();
+
+        // get hw initial settings
+        nas_qos_port_pg_fetch_from_hw(ndi_port_id, ndi_priority_group_id, &pg);
 
         EV_LOGGING(QOS, DEBUG, "QOS",
                      "NAS priority_group_id 0x%016lX is allocated for priority_group:"
-                     "local_qid %u, ndi_priority_group_id 0x%016lX",
+                     "local_pg_id %u, ndi_priority_group_id 0x%016lX",
                      priority_group_id, local_id, ndi_priority_group_id);
-       switch_p->add_priority_group(pg);
+        p_switch->add_priority_group(pg);
+
     }
     catch (...) {
         return NAS_QOS_E_FAIL;
@@ -439,35 +448,241 @@ static t_std_error create_port_priority_group(hal_ifindex_t port_id,
 
 }
 
+static void nas_qos_port_pg_get_shadow_pg(ndi_port_t ndi_port_id,
+                                ndi_obj_id_t ndi_pg_id,
+                                nas_qos_priority_group *pg)
+{
+    static bool number_of_mmu_known = false;
+    static uint_t number_of_mmu = 0;
+
+    // clear up first
+    pg->reset_shadow_pg_ids();
+
+    // Get from SAI
+    if (number_of_mmu_known == false) {
+
+        number_of_mmu = ndi_qos_get_shadow_priority_group_list(
+                            ndi_port_id.npu_id,
+                            ndi_pg_id,
+                            0, NULL);
+
+        number_of_mmu_known = true;
+    }
+
+    if (number_of_mmu == 0)
+        return;
+
+    uint count = number_of_mmu;
+    std::vector<ndi_obj_id_t> shadow_pg_list(count);
+
+    if (ndi_qos_get_shadow_priority_group_list(
+                            ndi_port_id.npu_id,
+                            ndi_pg_id,
+                            shadow_pg_list.size(),
+                            &shadow_pg_list[0]) != count) {
+        EV_LOGGING(QOS, ERR, "QOS-Q",
+                "Shadow pgs get failed on npu_port %d, ndi_q_id 0x%016lx",
+                ndi_port_id.npu_port, ndi_pg_id);
+        return;
+    }
+
+    // Populate local cache
+    for (uint_t i = 0; i< count; i++)
+        pg->add_shadow_pg_id(shadow_pg_list[i]);
+
+}
+
+
+static void nas_qos_port_pg_fetch_from_hw(ndi_port_t ndi_port_id,
+        ndi_obj_id_t ndi_priority_group_id,
+        nas_qos_priority_group * port_pg)
+{
+    ndi_qos_priority_group_attribute_t ndi_pg = {0};
+
+    if (ndi_qos_get_priority_group_attribute(ndi_port_id,
+                                        ndi_priority_group_id,
+                                        &ndi_pg)
+            != STD_ERR_OK) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+                "Some Attribute is not supported by NDI for reading\n");
+    }
+
+    nas_qos_switch *p_switch = nas_qos_get_switch(0);
+    if (p_switch == NULL) {
+        return ;
+    }
+
+    port_pg->set_buffer_profile(p_switch->ndi2nas_buffer_profile_id(ndi_pg.buffer_profile, ndi_port_id.npu_id));
+
+    port_pg->add_npu(ndi_port_id.npu_id);
+    port_pg->set_ndi_port_id(ndi_port_id.npu_id, ndi_port_id.npu_port);
+    port_pg->set_ndi_obj_id(ndi_priority_group_id);
+    port_pg->mark_ndi_created();
+
+    // get the shadow pg list
+    nas_qos_port_pg_get_shadow_pg(ndi_port_id, ndi_priority_group_id, port_pg);
+
+
+}
+
+/*
+ * This function handles the ifindex to NPU-Port association,
+ * pushing the saved DB configuration to npu.
+ * @Param ifindex
+ * @Param ndi_port
+ * @Param isAdd: true if establishing a physical port association
+ *               false if dissolve the virtual port to physical port association
+ * @Return
+ */
+void nas_qos_port_priority_group_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd)
+{
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS-PG",
+                     "switch_id cannot be found with npu_id %d",
+                     ndi_port_id.npu_id);
+        return ;
+    }
+
+    /* get NAS-initialized number of PGs on ifindex */
+    uint_t pg_num = p_switch->get_number_of_port_priority_groups(ifindex);
+    std::vector<nas_qos_priority_group *> pg_list(pg_num);
+    p_switch->get_port_priority_groups(ifindex, pg_num, &pg_list[0]);
+
+
+    if (isAdd == false) {
+        EV_LOGGING(QOS, NOTICE, "QOS-PG", "Disassociation ifindex %d", ifindex);
+
+        // clear up all pg's of ifindex and re-init new ones ; will load DB for VP config
+        p_switch->delete_pg_by_ifindex(ifindex);
+        nas_qos_port_priority_group_init_vp(ifindex);
+    }
+    else {
+        EV_LOGGING(QOS, NOTICE, "QOS-PG", "Association ifindex %d to npu port %d",
+                ifindex, ndi_port_id.npu_port);
+
+        /* get ndi_pg_id list */
+        /* get the number of priority_groups per port */
+        uint_t no_of_priority_group = ndi_qos_get_number_of_priority_groups(ndi_port_id);
+        if (no_of_priority_group == 0) {
+            EV_LOGGING(QOS, INFO, "QOS",
+                         "No priority_groups for npu_id %u, npu_port_id %u ",
+                         ndi_port_id.npu_id, ndi_port_id.npu_port);
+            return;
+        }
+
+        if (pg_num != no_of_priority_group) {
+            EV_LOGGING(QOS, ERR, "QOS",
+                    "Number of PG initialized %d is not equal to number of ndi PG %d",
+                    pg_num, no_of_priority_group);
+            return;
+        }
+
+        /* get the list of ndi_priority_group id list */
+        std::vector<ndi_obj_id_t> ndi_priority_group_id_list(no_of_priority_group);
+        if (ndi_qos_get_priority_group_id_list(ndi_port_id, no_of_priority_group,
+                                               &ndi_priority_group_id_list[0]) !=
+                no_of_priority_group) {
+            EV_LOGGING(QOS, NOTICE, "QOS",
+                         "Fail to retrieve all priority_groups of npu_id %u, npu_port_id %u ",
+                         ndi_port_id.npu_id, ndi_port_id.npu_port);
+            return;
+        }
+
+        // update npu port association and read the hardware initial settings
+        for (uint_t i = 0; i< pg_num; i++) {
+            nas_qos_port_pg_fetch_from_hw(ndi_port_id, ndi_priority_group_id_list[i], pg_list[i]);
+        }
+    }
+
+    // push DB to NPU
+    cps_api_object_guard _og(cps_api_object_create());
+    if(!_og.valid()){
+        EV_LOGGING(QOS,ERR,"QOS-DB-GET","Failed to create object for db get");
+        return;
+    }
+
+    cps_api_key_from_attr_with_qual(cps_api_object_key(_og.get()),
+            BASE_QOS_PRIORITY_GROUP_OBJ,
+            cps_api_qualifier_TARGET);
+    cps_api_set_key_data(_og.get(), BASE_QOS_PRIORITY_GROUP_PORT_ID,
+            cps_api_object_ATTR_T_U32,
+            &ifindex, sizeof(uint32_t));
+    cps_api_object_list_guard lst(cps_api_object_list_create());
+    if (cps_api_db_get(_og.get(),lst.get())==cps_api_ret_code_OK) {
+        size_t len = cps_api_object_list_size(lst.get());
+
+        for (uint_t idx = 0; idx < len; idx++){
+            cps_api_object_t db_obj = cps_api_object_list_get(lst.get(),idx);
+
+            cps_api_key_set_attr(cps_api_object_key(db_obj), cps_api_oper_SET);
+
+            // push the DB to NPU
+            nas_qos_cps_api_priority_group_set(db_obj, NULL);
+
+            EV_LOGGING(QOS, NOTICE,"QOS-DB",
+                    "One Port Priority Group DB record on port %d written to NPU",
+                    ifindex);
+
+        }
+    }
+}
+
+static t_std_error nas_qos_port_priority_group_init_vp(hal_ifindex_t port_id)
+{
+
+    nas_qos_switch *p_switch = nas_qos_get_switch(0);
+    if (p_switch == NULL) {
+        return NAS_QOS_E_FAIL;
+    }
+
+    /* 8 dot1p priority */
+    for (uint_t idx = 0; idx < 8; idx++) {
+
+        try {
+            // create the priority_group and add the priority_group to switch
+            nas_obj_id_t priority_group_id = p_switch->alloc_priority_group_id();
+            nas_qos_priority_group_key_t key;
+            key.port_id = port_id;
+            key.local_id = idx;
+            nas_qos_priority_group pg (p_switch, key);
+
+            pg.set_priority_group_id(priority_group_id);
+
+            EV_LOGGING(QOS, DEBUG, "QOS",
+                         "NAS priority_group_id 0x%016lX is allocated for priority_group:"
+                         "local_pg_id %u, on VP %d",
+                         priority_group_id, idx, port_id);
+           p_switch->add_priority_group(pg);
+
+        }
+        catch (...) {
+            return NAS_QOS_E_FAIL;
+        }
+
+    }
+
+    return STD_ERR_OK;
+}
+
+
 
 /* This function initializes the priority_groups of a port
  * @Return standard error code
  */
-static t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex)
+t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex, ndi_port_t ndi_port_id)
 {
-    interface_ctrl_t intf_ctrl;
 
-    if (nas_qos_get_port_intf(ifindex, &intf_ctrl) == false) {
-        EV_LOGGING(QOS, NOTICE, "QOS",
-                     "Cannot find ifindex %u",
-                     ifindex);
-        return NAS_QOS_E_FAIL;
-    }
+    if (nas_is_virtual_port(ifindex))
+        return nas_qos_port_priority_group_init_vp(ifindex);
 
-    nas_qos_switch *switch_p = nas_qos_get_switch_by_npu(intf_ctrl.npu_id);
-    if (switch_p == NULL) {
-        EV_LOGGING(QOS, NOTICE, "QOS",
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS-PG",
                      "switch_id of npu_id: %u cannot be found/created",
-                     intf_ctrl.npu_id);
+                     ndi_port_id.npu_id);
         return NAS_QOS_E_FAIL;
     }
-
-    if (switch_p->port_priority_group_is_initialized(ifindex))
-        return STD_ERR_OK; // initialized
-
-    ndi_port_t ndi_port_id;
-    ndi_port_id.npu_id = intf_ctrl.npu_id;
-    ndi_port_id.npu_port = intf_ctrl.port_id;
 
     /* get the number of priority_groups per port */
     uint_t no_of_priority_group = ndi_qos_get_number_of_priority_groups(ndi_port_id);
@@ -489,31 +704,17 @@ static t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex)
         return NAS_QOS_E_FAIL;
     }
 
-    /* retrieve the ndi-priority_group type and
-     * assign the priority_groups to with nas_priority_group_key
-     */
-    ndi_qos_priority_group_attribute_t ndi_qos_priority_group_attr;
-    uint8_t local_id = 0;
-
-    hal_ifindex_t port_id = ifindex;
-
+    /* Create priority_groups with nas_priority_group_key     */
     for (uint_t idx = 0; idx < no_of_priority_group; idx++) {
 
-        ndi_qos_get_priority_group_attribute(ndi_port_id,
-                                    ndi_priority_group_id_list[idx],
-                                    &ndi_qos_priority_group_attr);
-
         // Internally create NAS priority_group nodes and add to NAS QOS
-        if (create_port_priority_group(port_id, local_id,
+        if (create_port_priority_group(ifindex, ndi_port_id, idx,
                     ndi_priority_group_id_list[idx]) != STD_ERR_OK) {
             EV_LOGGING(QOS, NOTICE, "QOS",
                          "Not able to create ifindex %u, local_id %u",
-                         port_id, local_id);
+                         ifindex, idx);
             return NAS_QOS_E_FAIL;
         }
-
-        local_id++;
-
     }
 
     return STD_ERR_OK;
@@ -571,6 +772,11 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
     key.port_id = cps_api_object_attr_data_u32(port_id_attr);
     key.local_id = *(uint8_t *)cps_api_object_attr_data_bin(local_id_attr);
 
+    cps_api_object_attr_t mmu_index_attr = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX);
+    uint_t nas_mmu_index = (mmu_index_attr? cps_api_object_attr_data_u32(mmu_index_attr): 0);
+
+    if (nas_is_virtual_port(key.port_id))
+        return NAS_QOS_E_FAIL;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
             "Read switch id %u, port_id %u priority_group local id %u stat\n",
@@ -578,16 +784,13 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
 
     std_mutex_simple_lock_guard p_m(&priority_group_mutex);
 
-    // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_priority_group_init(key.port_id);
-
-    nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
-    if (switch_p == NULL) {
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    nas_qos_priority_group * priority_group_p = switch_p->get_priority_group(key);
+    nas_qos_priority_group * priority_group_p = p_switch->get_priority_group(key);
     if (priority_group_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Priority Group not found");
         return NAS_QOS_E_FAIL;
@@ -622,8 +825,17 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
         }
     }
 
+    if (counter_ids.size() == 0) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Port PG stats get without any valid counter ids");
+        return NAS_QOS_E_FAIL;
+    }
+
+    ndi_obj_id_t ndi_pg_id = priority_group_p->ndi_obj_id();
+    if (nas_mmu_index != 0)
+        ndi_pg_id = priority_group_p->get_shadow_pg_id(nas_mmu_index);
+
     if (ndi_qos_get_priority_group_stats(priority_group_p->get_ndi_port_id(),
-                                priority_group_p->ndi_obj_id(),
+                                ndi_pg_id,
                                 &counter_ids[0],
                                 counter_ids.size(),
                                 &stats) != STD_ERR_OK) {
@@ -689,6 +901,11 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
     key.port_id = cps_api_object_attr_data_u32(port_id_attr);
     key.local_id = *(uint8_t *)cps_api_object_attr_data_bin(local_id_attr);
 
+    cps_api_object_attr_t mmu_index_attr = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX);
+    uint_t nas_mmu_index = (mmu_index_attr? cps_api_object_attr_data_u32(mmu_index_attr): 0);
+
+    if (nas_is_virtual_port(key.port_id))
+        return NAS_QOS_E_FAIL;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
             "Read switch id %u, port_id %u priority_group local_id %u stat\n",
@@ -696,16 +913,13 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
 
     std_mutex_simple_lock_guard p_m(&priority_group_mutex);
 
-    // If the port is not be initialized yet, initialize it in NAS
-    nas_qos_port_priority_group_init(key.port_id);
-
-    nas_qos_switch *switch_p = nas_qos_get_switch(switch_id);
-    if (switch_p == NULL) {
+    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    nas_qos_priority_group * priority_group_p = switch_p->get_priority_group(key);
+    nas_qos_priority_group * priority_group_p = p_switch->get_priority_group(key);
     if (priority_group_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Priority Group not found");
         return NAS_QOS_E_FAIL;
@@ -743,8 +957,17 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
         }
     }
 
+    if (counter_ids.size() == 0) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Port PG stats clear without any valid counter ids");
+        return NAS_QOS_E_FAIL;
+    }
+
+    ndi_obj_id_t ndi_pg_id = priority_group_p->ndi_obj_id();
+    if (nas_mmu_index != 0)
+        ndi_pg_id = priority_group_p->get_shadow_pg_id(nas_mmu_index);
+
     if (ndi_qos_clear_priority_group_stats(priority_group_p->get_ndi_port_id(),
-                                priority_group_p->ndi_obj_id(),
+                                ndi_pg_id,
                                 &counter_ids[0],
                                 counter_ids.size()) != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Priority Group stats clear failed");

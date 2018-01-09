@@ -167,7 +167,7 @@ static cps_api_return_code_t _append_one_policer(cps_api_get_params_t * param,
     cps_api_set_key_data(ret_obj, BASE_QOS_METER_ID,
             cps_api_object_ATTR_T_U64,
             &policer_id, sizeof(uint64_t));
-    cps_nas_qos_policer_struct_t cfg = policer->get_cfg();
+    nas_qos_policer_struct_t cfg = policer->get_cfg();
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_METER_TYPE, cfg.ndi_cfg.meter_type);
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_METER_MODE, cfg.ndi_cfg.meter_mode);
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_METER_COLOR_SOURCE, cfg.ndi_cfg.color_source);
@@ -478,7 +478,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
 {
     npu_id_t npu_id;
     uint_t val;
-    cps_nas_qos_policer_struct_t cfg = policer.get_cfg();
+    nas_qos_policer_struct_t cfg = policer.get_cfg();
     cps_api_object_it_t it;
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
@@ -618,7 +618,7 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                     const nas::attr_set_t attr_set,
                                                     const nas_qos_policer &policer)
 {
-    cps_nas_qos_policer_struct_t cfg = policer.get_cfg();
+    nas_qos_policer_struct_t cfg = policer.get_cfg();
 
     // filling in the keys
     cps_api_key_from_attr_with_qual(cps_api_object_key(obj),BASE_QOS_METER_OBJ,

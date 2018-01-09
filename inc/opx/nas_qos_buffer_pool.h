@@ -26,15 +26,24 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
+#include "dell-base-qos.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
+#include "nas_ndi_qos.h"
 
 class nas_qos_switch;
+
+typedef struct nas_qos_buffer_pool_struct{
+    uint32_t shared_size;     // Read-only, remaining shared buffer size
+    BASE_QOS_BUFFER_POOL_TYPE_t     type;     // buffer pool type: Ingress or Egress
+    uint32_t size;             // total size of the buffer pool
+    BASE_QOS_BUFFER_THRESHOLD_MODE_t threshold_mode; // shared threshold mode for the buffer pool
+    uint32_t xoff_size;        // shared headroom pool size in bytes for lossless traffic
+    nas_obj_id_t wred_profile_id;  // WRED profile attached to the pool
+}nas_qos_buffer_pool_struct_t;
+
 
 class nas_qos_buffer_pool : public nas::base_obj_t
 {
@@ -43,7 +52,7 @@ class nas_qos_buffer_pool : public nas::base_obj_t
     nas_obj_id_t buffer_pool_id;
 
     // attributes
-    qos_buffer_pool_struct_t cfg;
+    nas_qos_buffer_pool_struct_t cfg;
 
     ///// Typedefs /////
     typedef std::unordered_map <npu_id_t, ndi_obj_id_t> ndi_obj_id_map_t;
@@ -53,9 +62,14 @@ class nas_qos_buffer_pool : public nas::base_obj_t
     // managed by this NAS component
     ndi_obj_id_map_t          _ndi_obj_ids;
 
+    // list of shadow buffer pool ids on all different MMUs
+    // If the buffer pool does not exist in a particular MMU,
+    // NULL_OBJECT_ID will be stored at that MMU location.
+    std::vector<ndi_obj_id_t> _shadow_ndi_obj_id_list;
+
 public:
 
-    nas_qos_buffer_pool (nas_qos_switch* switch_p);
+    nas_qos_buffer_pool (nas_qos_switch* p_switch);
 
     const nas_qos_switch& get_switch() ;
 
@@ -63,9 +77,9 @@ public:
     void    set_buffer_pool_id(nas_obj_id_t id) {buffer_pool_id = id;}
 
     // shared_size is READ-ONLY
-    uint32_t    get_shared_size();
+    uint32_t    get_shared_size(uint_t nas_mmu_index);
 
-    uint32_t    get_size() const {return cfg.size;}
+    uint32_t    get_size(uint_t nas_mmu_index = 0);
     void        set_size(uint32_t size) {cfg.size = size;}
 
     uint32_t    get_xoff_size() const {return cfg.xoff_size;}
@@ -77,8 +91,9 @@ public:
     void  set_threshold_mode(BASE_QOS_BUFFER_THRESHOLD_MODE_t mode) {
         cfg.threshold_mode = mode;
     }
-    ndi_obj_id_t get_wred_profile_id() const { return cfg.wred_profile_id; }
-    void set_wred_profile_id(ndi_obj_id_t profile_id) { cfg.wred_profile_id = profile_id; }
+
+    nas_obj_id_t get_wred_profile_id() const { return cfg.wred_profile_id; }
+    void set_wred_profile_id(nas_obj_id_t profile_id) { cfg.wred_profile_id = profile_id; }
 
     /// Overriding base object virtual functions
     virtual const char* name () const override { return "QOS buffer_pool";}
@@ -106,6 +121,16 @@ public:
 
     bool  get_first_npu_id(npu_id_t &npu_id);
 
+    void reset_shadow_buffer_pool_ids() {_shadow_ndi_obj_id_list.clear();}
+    void add_shadow_buffer_pool_id(ndi_obj_id_t id) {_shadow_ndi_obj_id_list.push_back(id);}
+    uint_t get_shadow_buffer_pool_count() {return _shadow_ndi_obj_id_list.size();}
+    ndi_obj_id_t get_shadow_buffer_pool_id(uint_t nas_mmu_idx) {
+        uint_t ndi_mmu_idx = nas_mmu_idx - 1;
+        if (ndi_mmu_idx < _shadow_ndi_obj_id_list.size())
+            return _shadow_ndi_obj_id_list[ndi_mmu_idx];
+        else
+            return NDI_QOS_NULL_OBJECT_ID;
+    }
 } ;
 
 inline ndi_obj_id_t nas_qos_buffer_pool::ndi_obj_id (npu_id_t npu_id) const

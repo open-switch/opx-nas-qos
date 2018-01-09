@@ -24,14 +24,12 @@
 #ifndef _NAS_QOS_COMMON_H_
 #define _NAS_QOS_COMMON_H_
 
-#include "nas_types.h"
-#include "dell-base-qos.h"
 #include "ietf-inet-types.h"
 #include "nas_ndi_qos.h"
 
 /** NAS QOS Error Codes */
-#define NAS_QOS_E_NONE            (int)STD_ERR_OK
-#define NAS_QOS_E_MEM            (int)STD_ERR (QOS, NONMEM, 0)
+#define NAS_QOS_E_NONE          (int)STD_ERR_OK
+#define NAS_QOS_E_MEM           (int)STD_ERR (QOS, NONMEM, 0)
 
 #define NAS_QOS_E_MISSING_KEY   (int)STD_ERR (QOS, CFG, 1)
 #define NAS_QOS_E_MISSING_ATTR  (int)STD_ERR (QOS, CFG, 2)
@@ -48,12 +46,36 @@
 
 #define NAS_QOS_E_FAIL          (int)STD_ERR (QOS, FAIL, 0) // All other run time failures
 
-
+#define NAS_QOS_NULL_OBJECT_ID  0
 
 // TYPE MASK prepended to the nas-obj-id to make QUEUE-id and Scheduler-id
 // unique across the NAS subsystem
-#define NAS_QUEUE_ID_TYPE_MASK              0x0001000000000000UL
-#define NAS_SCHEDULER_GROUP_ID_TYPE_MASK    0x0002000000000000UL
+#define NAS_QUEUE_ID_TYPE_MASK              0x1000000000000000UL
+#define NAS_SCHEDULER_GROUP_ID_TYPE_MASK    0x2000000000000000UL
+
+#define NAS_SCHEDULER_GROUP_ID_AUTO_FORMED  0x0100000000000000UL
+#define IS_SG_ID_AUTO_FORMED(x)             ((x) & NAS_SCHEDULER_GROUP_ID_AUTO_FORMED)
+
+// Format of allocated nas-sg-id:
+//  { SG_TYPE_MASK (8-bits) | level (8-bits) | local-sg-index (16-bits) | port_id (32-bit) }
+#define NAS_SG_ID_LEVEL_POS             48
+#define NAS_SG_ID_LOCAL_SG_INDEX_POS    32
+#define NAS_SG_ID_PORT_ID_POS            0
+
+#define NAS_SG_ID_LEVEL_FIELD_MASK          0x00FF000000000000UL
+#define NAS_SG_ID_LOCAL_SG_INDEX_FIELD_MASK 0x0000FFFF00000000UL
+#define NAS_SG_ID_PORT_ID_FIELD_MASK        0x00000000FFFFFFFFUL
+
+#define NAS_QOS_FORMAT_SG_ID(port_id, level, local_sg_index) \
+                (NAS_SCHEDULER_GROUP_ID_TYPE_MASK | \
+                 NAS_SCHEDULER_GROUP_ID_AUTO_FORMED | \
+                    (((uint64_t)level)          << NAS_SG_ID_LEVEL_POS) | \
+                    (((uint64_t)local_sg_index) << NAS_SG_ID_LOCAL_SG_INDEX_POS) | \
+                    (((uint64_t)port_id         << NAS_SG_ID_PORT_ID_POS)))
+
+#define NAS_QOS_GET_SG_LEVEL(x)       (((x) & NAS_SG_ID_LEVEL_FIELD_MASK) >> NAS_SG_ID_LEVEL_POS)
+#define NAS_QOS_GET_SG_LOCAL_INDEX(x) (((x) & NAS_SG_ID_LOCAL_SG_INDEX_FIELD_MASK) >> NAS_SG_ID_LOCAL_SG_INDEX_POS)
+#define NAS_QOS_GET_SG_PORT_ID(x)     (((x) & NAS_SG_ID_PORT_ID_FIELD_MASK) >> NAS_SG_ID_PORT_ID_POS)
 
 typedef ndi_qos_map_type_t nas_qos_map_type_t;
 
@@ -122,5 +144,22 @@ typedef struct nas_qos_map_entry_value_t {
 } nas_qos_map_entry_value_t;
 
 
+typedef struct stat_attr_capability_t {
+    bool            read_ok;
+    bool            write_ok;
+}stat_attr_capability;
+
+
+t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex, ndi_port_t ndi_port_id);
+t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex, ndi_port_t ndi_port_id);
+t_std_error nas_qos_port_ingress_init(hal_ifindex_t port_id, ndi_port_t ndi_port_id);
+t_std_error nas_qos_port_egress_init(hal_ifindex_t port_id, ndi_port_t ndi_port_id);
+void nas_qos_port_ingress_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+void nas_qos_port_egress_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+void nas_qos_port_priority_group_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+void nas_qos_port_queue_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+void nas_qos_port_scheduler_group_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+void nas_qos_port_pool_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
+bool nas_qos_port_is_initialized(uint32_t switch_id, hal_ifindex_t port_id);
 
 #endif

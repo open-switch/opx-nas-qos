@@ -26,29 +26,26 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
-#include "cps_api_object.h"
+#include "nas_ndi_qos.h"
 #include "nas_ndi_obj_id_table.h"
 
 class nas_qos_switch;
 
 
-typedef struct cps_nas_qos_policer_struct {
+typedef struct nas_qos_policer_struct {
     nas_obj_id_t         policer_id; // NAS policer id
     qos_policer_struct_t ndi_cfg;
-} cps_nas_qos_policer_struct_t;
+} nas_qos_policer_struct_t;
 
 class nas_qos_policer : public nas::base_obj_t
 {
 
     // cfg contains the values of all modified attributes
-    cps_nas_qos_policer_struct_t cfg;
+    nas_qos_policer_struct_t cfg;
 
     // List of mapped NDI IDs one for each NPU
     // managed by this NAS component
@@ -56,15 +53,15 @@ class nas_qos_policer : public nas::base_obj_t
 
 public:
 
-    nas_qos_policer (nas_qos_switch* switch_p);
+    nas_qos_policer (nas_qos_switch* p_switch);
 
     const nas_qos_switch& get_switch() ;
 
     nas_obj_id_t  policer_id() {return cfg.policer_id;}
     void          set_policer_id(nas_obj_id_t id) {cfg.policer_id = id;}
 
-    const cps_nas_qos_policer_struct_t& get_cfg() const {return cfg;}
-    void set_cfg(cps_nas_qos_policer_struct_t & new_cfg) {cfg = new_cfg;}
+    const nas_qos_policer_struct_t& get_cfg() const {return cfg;}
+    void set_cfg(nas_qos_policer_struct_t & new_cfg) {cfg = new_cfg;}
 
     bool  opaque_data_to_cps (cps_api_object_t cps_obj) const;
     bool  opaque_data_equal(nas_qos_policer * p);

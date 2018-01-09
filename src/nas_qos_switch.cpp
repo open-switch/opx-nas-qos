@@ -157,17 +157,22 @@ nas_qos_queue * nas_qos_switch::get_queue(nas_obj_id_t id)
 }
 
 
-void nas_qos_switch::dump_all_queues()
+void nas_qos_switch::dump_all_queues(hal_ifindex_t port_id)
 {
+    EV_LOGGING(QOS, NOTICE, "QOS", "dump queues");
+
     for (auto queue:  queues) {
-        EV_LOGGING(QOS, INFO, "QOS",
-                "nas: (port_id %u, local queue_id %u, type %u): queue_id 0x%ul ",
+        if (queue.first.port_id != port_id)
+            continue;
+
+        EV_LOGGING(QOS, NOTICE, "QOS",
+                "nas: (port_id %u, local queue_id %u, type %u): queue_id 0x%016lX ",
                 queue.first.port_id,
                 (uint_t)queue.first.local_queue_id,
                 (uint_t)queue.first.type,
                 queue.second.get_queue_id());
         for (auto npu_id: queue.second.npu_list()) {
-            EV_LOGGING(QOS, INFO, "QOS",
+            EV_LOGGING(QOS, NOTICE, "QOS",
                         "    ndi: npu %u, ndi_queue_id %u  ",
                         npu_id, (uint_t)queue.second.ndi_obj_id());
         }
@@ -193,7 +198,33 @@ uint_t nas_qos_switch::get_port_queues(hal_ifindex_t port_id,
     return i;
 }
 
+uint_t nas_qos_switch::get_port_queue_ids(hal_ifindex_t port_id,
+        uint_t count, nas_obj_id_t *q_id_list)
+{
+    queue_iter_t it;
+    nas_qos_queue_key_t key = {0};
+    key.port_id = port_id;
+    uint_t i = 0;
+
+    it = queues.lower_bound(key);
+    for (; it != queues.end(); it++) {
+        if (it->second.get_key().port_id > port_id)
+            break;
+
+        if (i < count)
+            q_id_list[i] = it->second.get_queue_id();
+
+        i++;
+    }
+    return i;
+}
+
 uint_t    nas_qos_switch::get_number_of_port_queues(hal_ifindex_t port_id)
+{
+    return get_number_of_port_queues_by_type(port_id, BASE_QOS_QUEUE_TYPE_NONE);
+}
+
+uint_t    nas_qos_switch::get_number_of_port_queues_by_type(hal_ifindex_t port_id, BASE_QOS_QUEUE_TYPE_t type)
 {
     queue_iter_t it;
     nas_qos_queue_key_t key = {0};
@@ -204,6 +235,12 @@ uint_t    nas_qos_switch::get_number_of_port_queues(hal_ifindex_t port_id)
     for (; it != queues.end(); it++) {
         if (it->second.get_key().port_id > port_id)
             break;
+
+        if (type != BASE_QOS_QUEUE_TYPE_NONE) {
+            // further matching type
+            if (it->second.get_type() != type)
+                continue;
+        }
 
         count++;
     }
@@ -292,7 +329,7 @@ nas_qos_scheduler_group * nas_qos_switch::get_scheduler_group(nas_obj_id_t sched
 }
 
 nas_qos_scheduler_group * nas_qos_switch::get_scheduler_group_by_id(npu_id_t npu_id,
-                                                                    nas_obj_id_t ndi_sg_id)
+                                                                    ndi_obj_id_t ndi_sg_id)
 {
     for (auto& sg_info: scheduler_groups) {
         if (sg_info.second.ndi_obj_id(npu_id) == ndi_sg_id) {
@@ -337,7 +374,8 @@ t_std_error nas_qos_switch::add_scheduler_group (nas_qos_scheduler_group& p)
 void nas_qos_switch::remove_scheduler_group (nas_obj_id_t scheduler_group_id)
 {
     EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id in switch: %d", scheduler_group_id);
-    release_scheduler_group_id(scheduler_group_id);
+    if (!IS_SG_ID_AUTO_FORMED(scheduler_group_id))
+        release_scheduler_group_id(scheduler_group_id);
 
     // remove from switch
     EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id from scheduler_group List: %d", scheduler_group_id);
@@ -503,7 +541,7 @@ void nas_qos_switch::dump_all_priority_groups()
 {
     for (auto priority_group:  priority_groups) {
         EV_LOGGING(QOS, INFO, "QOS",
-                "nas: (port_id %u, local id %u): priority_group_id 0x%ul ",
+                "nas: (port_id %u, local id %u): priority_group_id 0x%016lx ",
                 priority_group.first.port_id,
                 (uint_t)priority_group.first.local_id,
                 priority_group.second.get_priority_group_id());
@@ -536,20 +574,31 @@ uint_t nas_qos_switch::get_port_priority_groups(hal_ifindex_t port_id,
 
 uint_t    nas_qos_switch::get_number_of_port_priority_groups(hal_ifindex_t port_id)
 {
+    return (get_port_pg_ids(port_id, 0, NULL));
+}
+
+// Return number of nas_pg_ids of the port_id;
+// pg_id_list[count] will be filled with nas_pg_id
+uint_t    nas_qos_switch::get_port_pg_ids(hal_ifindex_t port_id, uint_t count, nas_obj_id_t *pg_id_list)
+{
     priority_group_iter_t it;
     nas_qos_priority_group_key_t key = {0};
     key.port_id = port_id;
-    uint_t count = 0;
+    uint_t i = 0;
 
     it = priority_groups.lower_bound(key);
     for (; it != priority_groups.end(); it++) {
         if (it->second.get_key().port_id > port_id)
             break;
 
-        count++;
+        if (i < count)
+            pg_id_list[i] = it->second.get_priority_group_id();
+
+        i++;
     }
 
-    return count;
+    return i;
+
 }
 
 bool    nas_qos_switch::port_priority_group_is_initialized(hal_ifindex_t port_id)
@@ -879,3 +928,120 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_policer_id(nas_obj_id_t policer_id, npu_id_
 
     return p_policer->ndi_obj_id(npu_id);
 }
+
+bool nas_qos_switch::port_is_initialized(hal_ifindex_t port_id)
+{
+    if (initialized_port_list.find(port_id) != initialized_port_list.end())
+        return true;
+    else
+        return false;
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_wred_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: wreds) {
+        if (it.second.ndi_obj_id(npu_id) == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_map_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: maps) {
+        if (it.second.ndi_obj_id(npu_id) == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_buffer_profile_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: buffer_profiles) {
+        if (it.second.ndi_obj_id(npu_id) == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_scheduler_profile_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: schedulers) {
+        if (it.second.ndi_obj_id(npu_id) == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_policer_id(ndi_obj_id_t ndi_obj_id, npu_id_t npu_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: policers) {
+        if (it.second.ndi_obj_id(npu_id) == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_queue_id(ndi_obj_id_t ndi_obj_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: queues) {
+        if (it.second.ndi_obj_id() == ndi_obj_id)
+            return it.second.get_queue_id();
+    }
+
+    return 0;
+}
+
+nas_obj_id_t nas_qos_switch::ndi2nas_scheduler_group_id(ndi_obj_id_t ndi_obj_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: scheduler_groups) {
+        if (it.second.ndi_obj_id() == ndi_obj_id)
+            return it.first;
+    }
+
+    return 0;
+}
+
+
+nas_obj_id_t nas_qos_switch::ndi2nas_priority_group_id(ndi_obj_id_t ndi_obj_id)
+{
+    if (ndi_obj_id == NDI_QOS_NULL_OBJECT_ID)
+        return 0;
+
+    for (auto &it: priority_groups) {
+        if (it.second.ndi_obj_id() == ndi_obj_id)
+            return it.second.get_priority_group_id();
+    }
+
+    return 0;
+}
+
+

@@ -28,11 +28,8 @@
 #include <algorithm>
 
 
-#include "nas_base_utils.h"
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
 #include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
@@ -66,12 +63,12 @@ class nas_qos_scheduler_group : public nas::base_obj_t
 
 public:
 
-    nas_qos_scheduler_group (nas_qos_switch* switch_p);
+    nas_qos_scheduler_group (nas_qos_switch* p_switch);
 
     const nas_qos_switch& get_switch() ;
 
     ndi_port_t get_ndi_port_id() const {return ndi_port_id;}
-    ndi_obj_id_t get_ndi_scheduler_group_id() const {return ndi_scheduler_group_id;}
+    ndi_obj_id_t ndi_obj_id() const {return ndi_scheduler_group_id;}
 
     nas_obj_id_t get_scheduler_group_id() const {return scheduler_group_id;}
     void    set_scheduler_group_id(nas_obj_id_t id) {scheduler_group_id = id;}
@@ -135,7 +132,10 @@ public:
 
 inline ndi_obj_id_t nas_qos_scheduler_group::ndi_obj_id (npu_id_t npu_id) const
 {
-    return (ndi_scheduler_group_id);
+    if (is_created_in_ndi())
+        return (ndi_scheduler_group_id);
+    else
+        return NDI_QOS_NULL_OBJECT_ID;
 }
 
 inline void nas_qos_scheduler_group::set_ndi_obj_id (npu_id_t npu_id,

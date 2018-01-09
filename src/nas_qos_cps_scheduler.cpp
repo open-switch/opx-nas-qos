@@ -256,7 +256,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
-    } catch (nas::base_exception& e) {
+    } catch (nas::base_exception &e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Create error code: %d ",
                     e.err_code);

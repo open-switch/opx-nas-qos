@@ -53,8 +53,6 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_rollback(void * context,
                                             cps_api_transaction_params_t * param,
                                             size_t ix);
 
-t_std_error nas_qos_port_priority_group_init(hal_ifindex_t ifindex);
-
 cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
                                             cps_api_get_params_t * param,
                                             size_t ix);

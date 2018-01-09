@@ -26,13 +26,12 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "dell-base-qos.h"
+#include "nas_ndi_common.h"
+#include "nas_ndi_qos.h"
 #include "nas_ndi_obj_id_table.h"
 
 class nas_qos_switch;
@@ -79,10 +78,14 @@ class nas_qos_queue : public nas::base_obj_t
     // managed by this NAS component
     nas::ndi_obj_id_table_t        _ndi_obj_ids;
 
+    // list of shadow queue ids on all different MMUs
+    // If the queue does not exist in a particular MMU,
+    // NULL_OBJECT_ID will be stored at that MMU location.
+    std::vector<ndi_obj_id_t> _shadow_ndi_obj_id_list;
 
 public:
 
-    nas_qos_queue (nas_qos_switch* switch_p, nas_qos_queue_key_t key);
+    nas_qos_queue (nas_qos_switch* p_switch, nas_qos_queue_key_t key);
 
     const nas_qos_switch& get_switch() ;
 
@@ -139,11 +142,24 @@ public:
     void set_ndi_obj_id (ndi_obj_id_t obj_id);
     void reset_ndi_obj_id ();
 
+    void reset_shadow_queue_ids() {_shadow_ndi_obj_id_list.clear();}
+    void add_shadow_queue_id(ndi_obj_id_t id) {_shadow_ndi_obj_id_list.push_back(id);}
+    uint_t get_shadow_queue_count() {return _shadow_ndi_obj_id_list.size();}
+    ndi_obj_id_t get_shadow_queue_id(uint_t nas_mmu_idx) {
+        uint_t ndi_mmu_idx = nas_mmu_idx - 1;
+        if (ndi_mmu_idx < _shadow_ndi_obj_id_list.size())
+            return _shadow_ndi_obj_id_list[ndi_mmu_idx];
+        else
+            return NDI_QOS_NULL_OBJECT_ID;
+    }
 } ;
 
 inline ndi_obj_id_t nas_qos_queue::ndi_obj_id () const
 {
-    return (_ndi_obj_ids.at (ndi_port_id.npu_id));
+    if (is_created_in_ndi())
+        return (_ndi_obj_ids.at (ndi_port_id.npu_id));
+    else
+        return NDI_QOS_NULL_OBJECT_ID;
 }
 
 inline void nas_qos_queue::set_ndi_obj_id (ndi_obj_id_t id)
@@ -187,7 +203,7 @@ inline void nas_qos_queue::set_scheduler_profile(nas_obj_id_t id)
 }
 
 /* Debugging and unit testing */
-void dump_nas_qos_queues(uint_t switch_id);
+void dump_nas_qos_queues(uint_t switch_id, hal_ifindex_t port_id);
 
 
 #endif

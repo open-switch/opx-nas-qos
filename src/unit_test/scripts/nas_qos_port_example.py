@@ -109,18 +109,33 @@ def test_qos_port_ingress(port_name):
             print 'Failed to create tc-to-queue map'
             return False
         get_map_example('tc-to-queue-map', tc_queue_id)
-    dot1p_tc_entries = [(2, 0, 'RED'), (3, 1, 'GREEN'), (4, 5, 'RED')]
-    dot1p_tc_id = create_map_example('dot1p-to-tc-color-map', dot1p_tc_entries)
+    dot1p_tc_entries = [(2, 0), (3, 1), (4, 5)]
+    dot1p_tc_id = create_map_example('dot1p-to-tc-map', dot1p_tc_entries)
     if dot1p_tc_id is None:
-        print 'Failed to create dot1p-to-tc-color map'
+        print 'Failed to create dot1p-to-tc map'
         return False
-    get_map_example('dot1p-to-tc-color-map', dot1p_tc_id)
-    dscp_tc_entries = [(0, 0, 'GREEN'), (1, 1, 'YELLOW')]
-    dscp_tc_id = create_map_example('dscp-to-tc-color-map', dscp_tc_entries)
+    get_map_example('dot1p-to-tc-map', dot1p_tc_id)
+
+    dot1p_color_entries = [(2, 'RED'), (3, 'GREEN'), (4, 'RED')]
+    dot1p_color_id = create_map_example('dot1p-to-color-map', dot1p_color_entries)
+    if dot1p_color_id is None:
+        print 'Failed to create dot1p-to-color map'
+        return False
+    get_map_example('dot1p-to-color-map', dot1p_color_id)
+
+    dscp_tc_entries = [(0, 0), (1, 1)]
+    dscp_tc_id = create_map_example('dscp-to-tc-map', dscp_tc_entries)
     if dscp_tc_id is None:
-        print 'Failed to create dscp-to-tc-color map'
+        print 'Failed to create dscp-to-tc map'
         return False
-    get_map_example('dscp-to-tc-color-map', dscp_tc_id)
+    get_map_example('dscp-to-tc-map', dscp_tc_id)
+
+    dscp_color_entries = [(0, 'GREEN'), (1, 'YELLOW')]
+    dscp_color_id = create_map_example('dscp-to-color-map', dscp_color_entries)
+    if dscp_color_id is None:
+        print 'Failed to create dscp-to-color map'
+        return False
+    get_map_example('dscp-to-color-map', dscp_color_id)
 
     print 'Start to create storm control policer profiles'
     flood_storm_control_id = create_storm_control_policer_example(200)
@@ -139,8 +154,10 @@ def test_qos_port_ingress(port_name):
         return False
 
     print 'Setup port ingress profile with maps and policers'
-    attr_entries = [('dot1p-to-tc-color-map', dot1p_tc_id),
-                    ('dscp-to-tc-color-map', dscp_tc_id),
+    attr_entries = [('dot1p-to-tc-map', dot1p_tc_id),
+                    ('dot1p-to-color-map', dot1p_color_id),
+                    ('dscp-to-tc-map', dscp_tc_id),
+                    ('dscp-to-color-map', dscp_color_id),
                     ('flood_storm_control', flood_storm_control_id),
                     ('broadcast_storm_control', bcast_storm_control_id),
                     ('multicast_storm_control', mcast_storm_control_id)]
@@ -165,8 +182,10 @@ def test_qos_port_ingress(port_name):
         return False
 
     print 'Reset map and policer in port ingress profile'
-    attr_entries = [('dot1p-to-tc-color-map', 0),
-                    ('dscp-to-tc-color-map', 0),
+    attr_entries = [('dot1p-to-tc-map', 0),
+                    ('dot1p-to-color-map', 0),
+                    ('dscp-to-tc-map', 0),
+                    ('dscp-to-color-map', 0),
                     ('flood_storm_control', 0),
                     ('broadcast_storm_control', 0),
                     ('multicast_storm_control', 0)]
@@ -196,13 +215,21 @@ def test_qos_port_ingress(port_name):
         if ret == False:
             print 'Failed to delete tc-to-queue map'
             return False
-    ret = delete_map_example('dot1p-to-tc-color-map', dot1p_tc_id)
+    ret = delete_map_example('dot1p-to-tc-map', dot1p_tc_id)
     if ret == False:
-        print 'Failed to delete dot1p-to-tc-color map'
+        print 'Failed to delete dot1p-to-tc map'
         return False
-    ret = delete_map_example('dscp-to-tc-color-map', dscp_tc_id)
+    ret = delete_map_example('dot1p-to-color-map', dot1p_color_id)
     if ret == False:
-        print 'Failed to delete dscp-to-tc-color map'
+        print 'Failed to delete dot1p-to-color map'
+        return False
+    ret = delete_map_example('dscp-to-tc-map', dscp_tc_id)
+    if ret == False:
+        print 'Failed to delete dscp-to-tc map'
+        return False
+    ret = delete_map_example('dscp-to-color-map', dscp_color_id)
+    if ret == False:
+        print 'Failed to delete dscp-to-color map'
         return False
 
     print 'Start to delete storm-control policer profiles'

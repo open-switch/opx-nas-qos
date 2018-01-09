@@ -16,16 +16,13 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_port_ingress.h"
-#include "dell-base-qos.h"
 #include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_port_ingress::nas_qos_port_ingress (nas_qos_switch* switch_p,
+nas_qos_port_ingress::nas_qos_port_ingress (nas_qos_switch* p_switch,
                             hal_ifindex_t port)
-           : base_obj_t(switch_p), port_id(port)
+           : base_obj_t(p_switch), port_id(port)
 {
     memset(&cfg, 0, sizeof(cfg));
     ndi_port_id = {0}; // for coverity check only

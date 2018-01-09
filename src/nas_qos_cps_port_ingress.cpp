@@ -14,10 +14,11 @@
  * permissions and limitations under the License.
  */
 
-#include "cps_api_events.h"
+#include "cps_api_key.h"
 #include "cps_api_operation.h"
 #include "cps_api_object_key.h"
 #include "cps_class_map.h"
+#include "cps_api_db_interface.h"
 
 #include "event_log_types.h"
 #include "event_log.h"
@@ -28,11 +29,16 @@
 #include "nas_qos_common.h"
 #include "nas_qos_switch_list.h"
 #include "nas_qos_cps.h"
-#include "cps_api_key.h"
 #include "dell-base-qos.h"
 #include "nas_qos_port_ingress.h"
+#include "nas_if_utils.h"
 
 static std_mutex_lock_create_static_init_rec(port_ing_mutex);
+static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
+                                            cps_api_object_t obj,
+                                            cps_api_object_list_t sav_obj);
+static void nas_qos_port_ingress_fetch_from_hw(ndi_port_t ndi_port_id,
+        nas_qos_port_ingress * port_ing);
 
 static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
                                                 nas_qos_port_ingress& port_ing)
@@ -40,6 +46,7 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
     uint_t val;
     uint64_t lval;
     cps_api_object_it_t it;
+    bool first_time = true;
 
     cps_api_object_it_begin(obj, &it);
     for ( ; cps_api_object_it_valid(&it); cps_api_object_it_next(&it)) {
@@ -134,8 +141,13 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
             }
             break;
         case BASE_QOS_PORT_INGRESS_BUFFER_PROFILE_ID_LIST:
+            if (first_time) {
+                port_ing.clear_buf_prof_id();
+                first_time = false;
+            }
             lval = cps_api_object_attr_data_u64(it.attr);
-            port_ing.add_buffer_profile_id(lval);
+            if (lval)
+                port_ing.add_buffer_profile_id(lval);
             port_ing.mark_attr_dirty(id);
             break;
 
@@ -259,14 +271,83 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-static t_std_error create_port_ing_profile(uint_t switch_id,
-                                         hal_ifindex_t port_id)
+static t_std_error nas_qos_port_ingress_init_vp(hal_ifindex_t port_id)
+{
+    nas_qos_switch *p_switch = nas_qos_get_switch(0);
+    if (p_switch == NULL) {
+        return NAS_QOS_E_FAIL;
+    }
+
+    try {
+        nas_qos_port_ingress port_ing(p_switch, port_id);
+
+        // init vp's pg_id_list
+        std::vector<nas_obj_id_t> nas_pg_id_list;
+        uint_t pg_id_count = p_switch->get_port_pg_ids(port_id, 0, NULL);
+        if (pg_id_count) {
+            nas_pg_id_list.resize(pg_id_count);
+            (void) (p_switch->get_port_pg_ids(port_id, pg_id_count, &nas_pg_id_list[0]));
+        }
+        for (uint_t idx = 0; idx < pg_id_count; idx ++) {
+            port_ing.add_priority_group_id(nas_pg_id_list[idx]);
+        }
+
+        p_switch->add_port_ingress(port_ing);
+
+
+    } catch (...) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
+                "Exception on creating nas_qos_port_ingress object for VP");
+        return NAS_QOS_E_FAIL;
+    }
+
+    return STD_ERR_OK;
+}
+
+/*
+ * This function initializes an ingress port node
+ * @Return standard error code
+ */
+t_std_error nas_qos_port_ingress_init(hal_ifindex_t port_id, ndi_port_t ndi_port_id)
+{
+    if (nas_is_virtual_port(port_id))
+        return nas_qos_port_ingress_init_vp(port_id);
+
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+            "Init port ingress profile: port %d\n",
+            port_id);
+
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, NOTICE, "QOS-ING",
+                     "switch_id of npu_id: %u cannot be found/created",
+                     ndi_port_id.npu_id);
+        return NAS_QOS_E_FAIL;
+    }
+
+    try {
+        nas_qos_port_ingress port_ing(p_switch, port_id);
+
+        nas_qos_port_ingress_fetch_from_hw(ndi_port_id, &port_ing);
+
+        p_switch->add_port_ingress(port_ing);
+
+    } catch (...) {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
+                "Exception on creating nas_qos_port_ingress object");
+        return NAS_QOS_E_FAIL;
+    }
+
+    return STD_ERR_OK;
+}
+
+static void nas_qos_port_ingress_fetch_from_hw(ndi_port_t ndi_port_id,
+        nas_qos_port_ingress * port_ing)
 {
     static const int MAX_PRIORITY_GROUP_ID_NUM = 32;
     static const int MAX_BUFFER_POOL_ID_NUM = 32;
     ndi_obj_id_t pg_id_list[MAX_PRIORITY_GROUP_ID_NUM] = {0};
     ndi_obj_id_t buf_prof_id_list[MAX_BUFFER_POOL_ID_NUM] = {0};
-    interface_ctrl_t intf_ctrl;
     BASE_QOS_PORT_INGRESS_t attr_list[] = {
         BASE_QOS_PORT_INGRESS_DEFAULT_TRAFFIC_CLASS,
         BASE_QOS_PORT_INGRESS_DOT1P_TO_TC_MAP,
@@ -288,115 +369,144 @@ static t_std_error create_port_ing_profile(uint_t switch_id,
         BASE_QOS_PORT_INGRESS_PRIORITY_GROUP_ID_LIST,
         BASE_QOS_PORT_INGRESS_BUFFER_PROFILE_ID_LIST,
     };
-    qos_port_ing_struct_t p;
+    qos_port_ing_struct_t ndi_info;
 
-    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF;
-    intf_ctrl.if_index = port_id;
-    intf_ctrl.vrf_id = 0;
-    if (dn_hal_get_interface_info(&intf_ctrl) != STD_ERR_OK) {
-        EV_LOGGING(QOS, INFO, "NAS-QOS",
-                "Failed to read interface info, if_index=%u\n", port_id);
-        return NAS_QOS_E_FAIL;
-    }
-
-    memset(&p, 0, sizeof(qos_port_ing_struct_t));
-    p.priority_group_id_list = pg_id_list;
-    p.num_priority_group_id = MAX_PRIORITY_GROUP_ID_NUM;
-    p.buffer_profile_list = buf_prof_id_list;
-    p.num_buffer_profile = MAX_BUFFER_POOL_ID_NUM;
+    memset(&ndi_info, 0, sizeof(qos_port_ing_struct_t));
+    ndi_info.priority_group_id_list = pg_id_list;
+    ndi_info.num_priority_group_id = MAX_PRIORITY_GROUP_ID_NUM;
+    ndi_info.buffer_profile_list = buf_prof_id_list;
+    ndi_info.num_buffer_profile = MAX_BUFFER_POOL_ID_NUM;
     int attr_num = sizeof(attr_list)/sizeof(attr_list[0]);
     for (int idx = 0; idx < attr_num; idx ++) {
-        int rc = ndi_qos_get_port_ing_profile(intf_ctrl.npu_id,
-                                            intf_ctrl.port_id,
+        int rc = ndi_qos_get_port_ing_profile(ndi_port_id.npu_id,
+                                            ndi_port_id.npu_port,
                                             &attr_list[idx], 1,
-                                            &p);
+                                            &ndi_info);
         if (rc != STD_ERR_OK) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                     "Attribute %u is not supported by NDI for reading\n", attr_list[idx]);
+            if (attr_list[idx] == BASE_QOS_PORT_INGRESS_PRIORITY_GROUP_ID_LIST) {
+                // in case of query failure, do not return any empty values
+                ndi_info.num_priority_group_id = 0;
+            }
+            if (attr_list[idx] == BASE_QOS_PORT_INGRESS_BUFFER_PROFILE_ID_LIST) {
+                ndi_info.num_buffer_profile = 0;
+            }
         }
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Create port ingress profile: switch %d port %d\n",
-            switch_id, port_id);
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch(0);
     if (p_switch == NULL) {
-        return NAS_QOS_E_FAIL;
+        return;
     }
 
-    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
-    try {
-        nas_qos_port_ingress port_ing(p_switch, port_id);
-        port_ing.set_default_traffic_class(p.default_tc);
-        port_ing.set_dot1p_to_tc_map(p.dot1p_to_tc_map);
-        port_ing.set_dot1p_to_color_map(p.dot1p_to_color_map);
-        port_ing.set_dot1p_to_tc_color_map(p.dot1p_to_tc_color_map);
-        port_ing.set_dscp_to_tc_map(p.dscp_to_tc_map);
-        port_ing.set_dscp_to_color_map(p.dscp_to_color_map);
-        port_ing.set_dscp_to_tc_color_map(p.dscp_to_tc_color_map);
-        port_ing.set_tc_to_queue_map(p.tc_to_queue_map);
-        port_ing.set_flow_control(p.flow_control);
-        port_ing.set_policer_id(p.policer_id);
-        port_ing.set_flood_storm_control(p.flood_storm_control);
-        port_ing.set_broadcast_storm_control(p.bcast_storm_control);
-        port_ing.set_multicast_storm_control(p.mcast_storm_control);
-        port_ing.set_tc_to_priority_group_map(p.tc_to_priority_group_map);
-        port_ing.set_priority_group_to_pfc_priority_map(p.priority_group_to_pfc_priority_map);
-        port_ing.set_per_priority_flow_control(p.per_priority_flow_control);
-        port_ing.set_priority_group_number(p.priority_group_number);
-        for (uint_t idx = 0; idx < p.num_priority_group_id; idx ++) {
-            port_ing.add_priority_group_id(p.priority_group_id_list[idx]);
-        }
-        for (uint_t idx = 0; idx < p.num_buffer_profile; idx ++) {
-            port_ing.add_buffer_profile_id(p.buffer_profile_list[idx]);
-        }
-        port_ing.add_npu(intf_ctrl.npu_id);
-        port_ing.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
-        port_ing.mark_ndi_created();
-
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Create port ingress profile: switch %d port %d, pg_num %d, num_pg_id %d, nu_b_p %d\n",
-            switch_id, port_id, p.priority_group_number, p.num_priority_group_id, p.num_buffer_profile);
-
-        p_switch->add_port_ingress(port_ing);
-    } catch (...) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                "Exception on creating nas_qos_port_ingress object");
-        return NAS_QOS_E_FAIL;
+    port_ing->set_default_traffic_class(ndi_info.default_tc);
+    port_ing->set_dot1p_to_tc_map(p_switch->ndi2nas_map_id(ndi_info.dot1p_to_tc_map, ndi_port_id.npu_id));
+    port_ing->set_dot1p_to_color_map(p_switch->ndi2nas_map_id(ndi_info.dot1p_to_color_map, ndi_port_id.npu_id));
+    port_ing->set_dot1p_to_tc_color_map(p_switch->ndi2nas_map_id(ndi_info.dot1p_to_tc_color_map, ndi_port_id.npu_id));
+    port_ing->set_dscp_to_tc_map(p_switch->ndi2nas_map_id(ndi_info.dscp_to_tc_map, ndi_port_id.npu_id));
+    port_ing->set_dscp_to_color_map(p_switch->ndi2nas_map_id(ndi_info.dscp_to_color_map, ndi_port_id.npu_id));
+    port_ing->set_dscp_to_tc_color_map(p_switch->ndi2nas_map_id(ndi_info.dscp_to_tc_color_map, ndi_port_id.npu_id));
+    port_ing->set_tc_to_queue_map(p_switch->ndi2nas_map_id(ndi_info.tc_to_queue_map, ndi_port_id.npu_id));
+    port_ing->set_flow_control(ndi_info.flow_control);
+    port_ing->set_policer_id(p_switch->ndi2nas_policer_id(ndi_info.policer_id, ndi_port_id.npu_id));
+    port_ing->set_flood_storm_control(p_switch->ndi2nas_policer_id(ndi_info.flood_storm_control, ndi_port_id.npu_id));
+    port_ing->set_broadcast_storm_control(p_switch->ndi2nas_policer_id(ndi_info.bcast_storm_control, ndi_port_id.npu_id));
+    port_ing->set_multicast_storm_control(p_switch->ndi2nas_policer_id(ndi_info.mcast_storm_control, ndi_port_id.npu_id));
+    port_ing->set_tc_to_priority_group_map(p_switch->ndi2nas_map_id(ndi_info.tc_to_priority_group_map, ndi_port_id.npu_id));
+    port_ing->set_priority_group_to_pfc_priority_map(p_switch->ndi2nas_map_id(ndi_info.priority_group_to_pfc_priority_map, ndi_port_id.npu_id));
+    port_ing->set_per_priority_flow_control(ndi_info.per_priority_flow_control);
+    port_ing->clear_priority_group_id();
+    for (uint_t idx = 0; idx < ndi_info.num_priority_group_id; idx ++) {
+        port_ing->add_priority_group_id(p_switch->ndi2nas_priority_group_id(ndi_info.priority_group_id_list[idx]));
     }
+    port_ing->clear_buf_prof_id();
+    for (uint_t idx = 0; idx < ndi_info.num_buffer_profile; idx ++) {
+        port_ing->add_buffer_profile_id(p_switch->ndi2nas_buffer_profile_id(ndi_info.buffer_profile_list[idx], ndi_port_id.npu_id));
+    }
+    port_ing->add_npu(ndi_port_id.npu_id);
+    port_ing->set_ndi_port_id(ndi_port_id.npu_id, ndi_port_id.npu_port);
+    port_ing->mark_ndi_created();
 
-    return STD_ERR_OK;
 }
 
-/* This function pre-loads the NAS QoS module with default QoS Port-ingress info
- * @Return standard error code
+/*
+ * This function handles the ifindex to NPU-Port association,
+ * pushing the saved DB configuration to npu.
+ * @Param ifindex
+ * @Param ndi_port
+ * @Param isAdd: true if establishing a physical port association
+ *               false if dissolve the virtual port to physical port association
+ * @Return
  */
-t_std_error nas_qos_port_ingress_init(uint_t switch_id,
-                                    hal_ifindex_t ifindex)
+void nas_qos_port_ingress_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd)
 {
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
+    nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
     if (p_switch == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Failed to get switch, switch_id=%d\n",
-                   switch_id);
-        return NAS_QOS_E_FAIL;
+        EV_LOGGING(QOS, NOTICE, "QOS-ING",
+                     "switch_id cannot be found with npu_id %d",
+                     ndi_port_id.npu_id);
+        return ;
     }
 
-    if (p_switch->port_ing_is_initialized(ifindex)) {
-        //already initialized
-        return STD_ERR_OK;
+    if (isAdd == false) {
+        EV_LOGGING(QOS, NOTICE, "QOS-ING", "Disassociation ifindex %d", ifindex);
+
+        // clear up and re-init a new one ; will load DB for VP config
+        p_switch->remove_port_ingress(ifindex);
+        nas_qos_port_ingress_init_vp(ifindex);
+    }
+    else {
+        EV_LOGGING(QOS, NOTICE, "QOS-ING", "Association ifindex %d to npu port %d",
+                ifindex, ndi_port_id.npu_port);
+
+        // update npu mapping
+        nas_qos_port_ingress * port_ing = p_switch->get_port_ingress(ifindex);
+
+        // update port_ing with npu-specific readings
+        nas_qos_port_ingress_fetch_from_hw(ndi_port_id, port_ing);
     }
 
-    cps_api_return_code_t rc = cps_api_ret_code_OK;
-    if ((rc = create_port_ing_profile(switch_id, ifindex)) !=
-            STD_ERR_OK) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                "Failed to create port ingress profile: %u\n", ifindex);
-        return rc;
+    // read DB and push to NPU
+    cps_api_object_guard _og(cps_api_object_create());
+    if(!_og.valid()){
+        EV_LOGGING(QOS,ERR,"QOS-DB-GET","Failed to create object for db get");
+        return;
     }
 
-    dump_nas_qos_port_ingress(switch_id);
+    cps_api_key_from_attr_with_qual(cps_api_object_key(_og.get()),
+            BASE_QOS_PORT_INGRESS_OBJ,
+            cps_api_qualifier_TARGET);
+    cps_api_set_key_data(_og.get(), BASE_QOS_PORT_INGRESS_PORT_ID,
+            cps_api_object_ATTR_T_U32,
+            &ifindex, sizeof(uint32_t));
+    cps_api_object_list_guard lst(cps_api_object_list_create());
+    if (cps_api_db_get(_og.get(),lst.get())==cps_api_ret_code_OK) {
+        size_t len = cps_api_object_list_size(lst.get());
 
-    return STD_ERR_OK;
+        if(len){
+            // Get should return only one object matching to the interface
+            if (len > 1) {
+                EV_LOGGING(QOS,WARNING,"QOS-DB-GET",
+                        "More than one entry (%d) with the same index %d in DB",
+                        len, ifindex);
+            }
+            cps_api_object_t db_obj = cps_api_object_list_get(lst.get(),0);
+
+            cps_api_key_set_attr(cps_api_object_key(db_obj), cps_api_oper_SET);
+
+            // push the DB to NPU
+            nas_qos_cps_api_port_ing_set(db_obj, NULL);
+
+            EV_LOGGING(QOS, NOTICE,"QOS-DB", "One Ingress Port DB record for port %d written to NPU", ifindex);
+
+        }
+        else {
+            EV_LOGGING(QOS, NOTICE, "QOS-DB-GET",
+                    "No DB entry with the same index %d in DB",
+                    ifindex);
+        }
+    }
 }
 
 static cps_api_return_code_t get_cps_obj_switch_port_id(cps_api_object_t obj,
@@ -434,14 +544,16 @@ static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, port id %u\n",
                     switch_id, port_id);
 
-    nas_qos_port_ingress_init(switch_id, port_id);
-
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                         "Switch %u not found\n",
                         switch_id);
         return NAS_QOS_E_FAIL;
+    }
+
+    if (!nas_qos_port_is_initialized(switch_id, port_id)) {
+        nas_qos_if_create_notify(port_id);
     }
 
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
@@ -465,28 +577,35 @@ static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying port ingress %u attr \n",
                      port_ing.get_port_id());
 
-        nas::attr_set_t modified_attr_list = port_ing.commit_modify(*port_ing_p,
-                                                    (sav_obj? false: true));
+        if (!nas_is_virtual_port(port_id)) {
+            nas::attr_set_t modified_attr_list = port_ing.commit_modify(*port_ing_p,
+                                                        (sav_obj? false: true));
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
 
 
-        // set attribute with full copy
-        // save rollback info if caller requests it.
-        // use modified attr list, current port ingress value
-        if (sav_obj) {
-            cps_api_object_t tmp_obj;
-            tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
-            if (tmp_obj == NULL) {
-                return cps_api_ret_code_ERR;
-            }
+            // set attribute with full copy
+            // save rollback info if caller requests it.
+            // use modified attr list, current port ingress value
+            if (sav_obj) {
+                cps_api_object_t tmp_obj;
+                tmp_obj = cps_api_object_list_create_obj_and_append(sav_obj);
+                if (tmp_obj == NULL) {
+                    return cps_api_ret_code_ERR;
+                }
 
-            nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *port_ing_p);
+                nas_qos_store_prev_attr(tmp_obj, modified_attr_list, *port_ing_p);
 
-       }
+           }
+        }
 
         // update the local cache with newly set values
         *port_ing_p = port_ing;
+
+        // update DB
+        if (cps_api_db_commit_one(cps_api_oper_SET, obj, nullptr, false) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Fail to store ingress port update to DB");
+        }
 
     } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS",
@@ -559,12 +678,14 @@ cps_api_return_code_t nas_qos_cps_api_port_ingress_read(void * context,
         return rc;
     }
 
+    if (!nas_qos_port_is_initialized(switch_id, port_id)) {
+        nas_qos_if_create_notify(port_id);
+    }
+
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, port id %u\n",
                  switch_id, port_id);
 
     std_mutex_simple_lock_guard p_m(&port_ing_mutex);
-
-    nas_qos_port_ingress_init(switch_id, port_id);
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
@@ -629,7 +750,7 @@ cps_api_return_code_t nas_qos_cps_api_port_ingress_read(void * context,
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_INGRESS_PRIORITY_GROUP_TO_PFC_PRIORITY_MAP,
                                 port_ing->get_priority_group_to_pfc_priority_map());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PORT_INGRESS_PRIORITY_GROUP_NUMBER,
-                                port_ing->get_priority_group_number());
+                                port_ing->get_priority_group_id_count());
     uint8_t bit_vec = port_ing->get_per_priority_flow_control();
     cps_api_object_attr_add(ret_obj, BASE_QOS_PORT_INGRESS_PER_PRIORITY_FLOW_CONTROL,
                             &bit_vec, sizeof(uint8_t));
@@ -646,7 +767,7 @@ cps_api_return_code_t nas_qos_cps_api_port_ingress_read(void * context,
 
 /*
   * This function provides NAS-QoS PORT-INGRESS CPS API rollback function
-  * @Param      Standard CPS API params
+  * @Param    Standard CPS API params
   * @Return   Standard Error Code
   */
 cps_api_return_code_t nas_qos_cps_api_port_ingress_rollback(void * context,
@@ -666,7 +787,7 @@ cps_api_return_code_t nas_qos_cps_api_port_ingress_rollback(void * context,
         nas_qos_cps_api_port_ing_set(obj, NULL);
     }
 
-    // create/delete are not allowed for queue, no roll-back is needed
+    // create/delete are not allowed for port ingress, no roll-back is needed
 
     return cps_api_ret_code_OK;
 }

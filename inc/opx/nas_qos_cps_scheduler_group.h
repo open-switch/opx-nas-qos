@@ -53,7 +53,6 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_rollback(void * context,
                                             cps_api_transaction_params_t * param,
                                             size_t ix);
 
-t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex);
 void nas_qos_notify_parent_child_change(uint_t switch_id, nas_obj_id_t parent_id,
                                         nas_obj_id_t child_id, bool add);
 

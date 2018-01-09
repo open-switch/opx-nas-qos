@@ -23,15 +23,13 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_map.h"
 #include "dell-base-qos.h"
 #include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_map::nas_qos_map (nas_qos_switch* switch_p, nas_qos_map_type_t val)
-           : base_obj_t (switch_p)
+nas_qos_map::nas_qos_map (nas_qos_switch* p_switch, nas_qos_map_type_t val)
+           : base_obj_t (p_switch)
 {
     type = val;
     map_id = 0;

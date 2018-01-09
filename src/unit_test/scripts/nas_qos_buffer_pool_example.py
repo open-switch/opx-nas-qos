@@ -18,7 +18,8 @@
 import cps_utils
 import cps
 import nas_qos
-
+import nas_qos_wred_example
+import sys
 
 def buffer_pool_create_example(pool_type):
     attr_list = {
@@ -84,6 +85,12 @@ def buffer_pool_modify_example(buffer_pool_id):
     ]
     return buffer_pool_modify_attrs(buffer_pool_id, mod_attrs)
 
+def buffer_pool_modify_wred_example(buffer_pool_id, wred_id):
+    mod_attrs = [
+        ('wred-profile-id', wred_id),
+    ]
+    return buffer_pool_modify_attrs(buffer_pool_id, mod_attrs)
+
 
 def buffer_pool_delete_example(buffer_pool_id):
     buffer_pool_obj = nas_qos.BufferPoolCPSObj(buffer_pool_id=buffer_pool_id)
@@ -100,10 +107,42 @@ def buffer_pool_delete_example(buffer_pool_id):
 if __name__ == '__main__':
     buffer_pool_id = buffer_pool_create_example('INGRESS')
     if buffer_pool_id is None:
-        exit()
+        sys.exit(0)
     buffer_pool_get_example(buffer_pool_id)
     buffer_pool_id = buffer_pool_modify_example(buffer_pool_id)
     if buffer_pool_id is None:
-        exit()
+        sys.exit(0)
     buffer_pool_get_example(buffer_pool_id)
     buffer_pool_delete_example(buffer_pool_id)
+
+
+    buffer_pool_id = buffer_pool_create_example('EGRESS')
+    if buffer_pool_id is None:
+        sys.exit(0)
+    buffer_pool_get_example(buffer_pool_id)
+
+    buffer_pool_id = buffer_pool_modify_example(buffer_pool_id)
+    if buffer_pool_id is None:
+        sys.exit(0)
+    buffer_pool_get_example(buffer_pool_id)
+
+    wred_id = nas_qos_wred_example.wred_profile_create_example()
+    if wred_id is None:
+        print 'Failed to create WRED profile'
+        sys.exit(0)
+
+    buffer_pool_id = buffer_pool_modify_wred_example(buffer_pool_id, wred_id)
+    if buffer_pool_id is None:
+        sys.exit(0)
+    buffer_pool_get_example(buffer_pool_id)
+
+    buffer_pool_id = buffer_pool_modify_wred_example(buffer_pool_id, 0)
+    if buffer_pool_id is None:
+        sys.exit(0)
+    buffer_pool_get_example(buffer_pool_id)
+
+
+    buffer_pool_delete_example(buffer_pool_id)
+
+    nas_qos_wred_example.wred_profile_delete_example(wred_id)
+

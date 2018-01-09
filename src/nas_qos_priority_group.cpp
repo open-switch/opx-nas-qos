@@ -23,16 +23,12 @@
 
 #include "event_log.h"
 #include "std_assert.h"
-#include "nas_qos_common.h"
 #include "nas_qos_priority_group.h"
-#include "dell-base-qos.h"
-#include "nas_ndi_qos.h"
-#include "nas_base_obj.h"
 #include "nas_qos_switch.h"
 
-nas_qos_priority_group::nas_qos_priority_group (nas_qos_switch* switch_p,
+nas_qos_priority_group::nas_qos_priority_group (nas_qos_switch* p_switch,
                                                 nas_qos_priority_group_key_t key)
-           : base_obj_t (switch_p),
+           : base_obj_t (p_switch),
              key(key)
 {
     priority_group_id = NDI_QOS_NULL_OBJECT_ID;

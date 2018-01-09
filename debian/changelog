@@ -1,3 +1,21 @@
+opx-nas-qos (2.2.0) unstable; urgency=medium
+
+  * Bugfix: fix a bug where buf-profile-id initialized on npu port is not read out to the associated VP
+  * Bugfix: fix a bug where updating buffer-pool-id-list of Port-ingress was not handled as an overwrite operation
+  * Bugfix: filter Virtual Port from Port Pool Stats retrieval or clearing
+  * Bugfix: fix an error in pushing the buffer pool size to sai
+  * Update: handling VP association for Port Pool data
+  * Update: add new ecn stats and buffer pool stats clearing capability
+  * Update: add TH MMU shadow queue support
+  * Update: XPE buffer pool support
+  * Update: XPE PG support
+  * Update: use new counter apis
+  * Update: fill queue-id-list of port-egress for VP
+  * Update: populate egress q-id-list and ingress pg-id-list for VP
+  * Update: buffer pool size is also per-mmu readable object
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 13 Dec 2017 14:45:18 -0800
+
 opx-nas-qos (2.1.0) unstable; urgency=medium
 
   * Update: Added WRED profiles

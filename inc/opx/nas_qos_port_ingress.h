@@ -19,15 +19,33 @@
 
 #include <unordered_map>
 
-#include "nas_qos_common.h"
 #include "std_type_defs.h"
 #include "ds_common_types.h" // npu_id_t
-#include "nas_base_utils.h"
+#include "dell-base-qos.h"
 #include "nas_base_obj.h"
-#include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
 
 class nas_qos_switch;
+
+typedef struct nas_qos_port_ing_struct {
+    uint_t          default_tc;
+    nas_obj_id_t    dot1p_to_tc_map;
+    nas_obj_id_t    dot1p_to_color_map;
+    nas_obj_id_t    dot1p_to_tc_color_map;
+    nas_obj_id_t    dscp_to_tc_map;
+    nas_obj_id_t    dscp_to_color_map;
+    nas_obj_id_t    dscp_to_tc_color_map;
+    nas_obj_id_t    tc_to_queue_map;
+    BASE_QOS_FLOW_CONTROL_t flow_control;
+    nas_obj_id_t    policer_id;
+    nas_obj_id_t    flood_storm_control;
+    nas_obj_id_t    bcast_storm_control;
+    nas_obj_id_t    mcast_storm_control;
+    uint8_t         per_priority_flow_control;
+    nas_obj_id_t    tc_to_priority_group_map;
+    nas_obj_id_t    priority_group_to_pfc_priority_map;
+}nas_qos_port_ing_struct_t;
+
 
 class nas_qos_port_ingress : public nas::base_obj_t
 {
@@ -35,21 +53,19 @@ class nas_qos_port_ingress : public nas::base_obj_t
     hal_ifindex_t port_id;
 
     // attributes
-    qos_port_ing_struct_t cfg;
+    nas_qos_port_ing_struct_t cfg;
 
-    // priority group id
-    // This vector replaces cfg.num_priority_group_id & cfg.priority_group_id_list
-    std::vector<ndi_obj_id_t> _pg_id_vec;
+    // priority group id; Read-only attribute
+    std::vector<nas_obj_id_t> _pg_id_vec;
 
     // buffer profile id list
-    // This vector replaces cfg.num_buffer_profile & cfg.buffer_profile_list
-    std::vector<ndi_obj_id_t> _buf_prof_vec;
+    std::vector<nas_obj_id_t> _buf_prof_vec;
 
     // cached info
     ndi_port_t ndi_port_id;
 
 public:
-    nas_qos_port_ingress(nas_qos_switch* switch_p, hal_ifindex_t port_id);
+    nas_qos_port_ingress(nas_qos_switch* p_switch, hal_ifindex_t port_id);
 
     const nas_qos_switch& get_switch();
 
@@ -62,32 +78,32 @@ public:
     uint_t get_default_traffic_class() const { return cfg.default_tc; }
     void set_default_traffic_class(uint_t traf_class) { cfg.default_tc = traf_class; }
 
-    ndi_obj_id_t get_dot1p_to_tc_map() const { return cfg.dot1p_to_tc_map; }
-    void set_dot1p_to_tc_map(ndi_obj_id_t map_id) { cfg.dot1p_to_tc_map = map_id; }
+    nas_obj_id_t get_dot1p_to_tc_map() const { return cfg.dot1p_to_tc_map; }
+    void set_dot1p_to_tc_map(nas_obj_id_t map_id) { cfg.dot1p_to_tc_map = map_id; }
 
-    ndi_obj_id_t get_dot1p_to_color_map() const { return cfg.dot1p_to_color_map; }
-    void set_dot1p_to_color_map(ndi_obj_id_t map_id) { cfg.dot1p_to_color_map = map_id; }
+    nas_obj_id_t get_dot1p_to_color_map() const { return cfg.dot1p_to_color_map; }
+    void set_dot1p_to_color_map(nas_obj_id_t map_id) { cfg.dot1p_to_color_map = map_id; }
 
-    ndi_obj_id_t get_dot1p_to_tc_color_map() const { return cfg.dot1p_to_tc_color_map; }
-    void set_dot1p_to_tc_color_map(ndi_obj_id_t map_id)
+    nas_obj_id_t get_dot1p_to_tc_color_map() const { return cfg.dot1p_to_tc_color_map; }
+    void set_dot1p_to_tc_color_map(nas_obj_id_t map_id)
     {
         cfg.dot1p_to_tc_color_map = map_id;
     }
 
-    ndi_obj_id_t get_dscp_to_tc_map() const { return cfg.dscp_to_tc_map; }
-    void set_dscp_to_tc_map(ndi_obj_id_t map_id) { cfg.dscp_to_tc_map = map_id; }
+    nas_obj_id_t get_dscp_to_tc_map() const { return cfg.dscp_to_tc_map; }
+    void set_dscp_to_tc_map(nas_obj_id_t map_id) { cfg.dscp_to_tc_map = map_id; }
 
-    ndi_obj_id_t get_dscp_to_color_map() const { return cfg.dscp_to_color_map; }
-    void set_dscp_to_color_map(ndi_obj_id_t map_id) { cfg.dscp_to_color_map = map_id; }
+    nas_obj_id_t get_dscp_to_color_map() const { return cfg.dscp_to_color_map; }
+    void set_dscp_to_color_map(nas_obj_id_t map_id) { cfg.dscp_to_color_map = map_id; }
 
-    ndi_obj_id_t get_dscp_to_tc_color_map() const { return cfg.dscp_to_tc_color_map; }
-    void set_dscp_to_tc_color_map(ndi_obj_id_t map_id)
+    nas_obj_id_t get_dscp_to_tc_color_map() const { return cfg.dscp_to_tc_color_map; }
+    void set_dscp_to_tc_color_map(nas_obj_id_t map_id)
     {
         cfg.dscp_to_tc_color_map = map_id;
     }
 
-    ndi_obj_id_t get_tc_to_queue_map() const { return cfg.tc_to_queue_map; }
-    void set_tc_to_queue_map(ndi_obj_id_t map_id)
+    nas_obj_id_t get_tc_to_queue_map() const { return cfg.tc_to_queue_map; }
+    void set_tc_to_queue_map(nas_obj_id_t map_id)
     {
         cfg.tc_to_queue_map = map_id;
     }
@@ -97,40 +113,41 @@ public:
         cfg.flow_control = (BASE_QOS_FLOW_CONTROL_t)flow_control;
     }
 
-    ndi_obj_id_t get_policer_id() const { return cfg.policer_id; }
-    void set_policer_id(ndi_obj_id_t id) { cfg.policer_id = id; }
+    nas_obj_id_t get_policer_id() const { return cfg.policer_id; }
+    void set_policer_id(nas_obj_id_t id) { cfg.policer_id = id; }
 
-    ndi_obj_id_t get_flood_storm_control() const { return cfg.flood_storm_control; }
-    void set_flood_storm_control(ndi_obj_id_t control_id)
+    nas_obj_id_t get_flood_storm_control() const { return cfg.flood_storm_control; }
+    void set_flood_storm_control(nas_obj_id_t control_id)
     {
         cfg.flood_storm_control = control_id;
     }
 
-    ndi_obj_id_t get_broadcast_storm_control() const { return cfg.bcast_storm_control; }
-    void set_broadcast_storm_control(ndi_obj_id_t control_id)
+    nas_obj_id_t get_broadcast_storm_control() const { return cfg.bcast_storm_control; }
+    void set_broadcast_storm_control(nas_obj_id_t control_id)
     {
         cfg.bcast_storm_control = control_id;
     }
 
-    ndi_obj_id_t get_multicast_storm_control() const { return cfg.mcast_storm_control; }
-    void set_multicast_storm_control(ndi_obj_id_t control_id)
+    nas_obj_id_t get_multicast_storm_control() const { return cfg.mcast_storm_control; }
+    void set_multicast_storm_control(nas_obj_id_t control_id)
     {
         cfg.mcast_storm_control = control_id;
     }
 
-    uint_t get_priority_group_number() const {return cfg.priority_group_number;}
-    void set_priority_group_number(uint_t val) {cfg.priority_group_number = val; }
-
     // READ-only PG-list
     uint32_t get_priority_group_id_count() const { return _pg_id_vec.size(); }
-    ndi_obj_id_t get_priority_group_id(uint32_t idx) const {
+    nas_obj_id_t get_priority_group_id(uint32_t idx) const {
         if (idx < get_priority_group_id_count())
             return _pg_id_vec[idx];
         else
             return 0LL;
     }
-    void add_priority_group_id(ndi_obj_id_t priority_group_id)
+    void add_priority_group_id(nas_obj_id_t priority_group_id)
     {
+        if (std::find(_pg_id_vec.begin(), _pg_id_vec.end(), priority_group_id)
+            != _pg_id_vec.end())
+            return;
+
         _pg_id_vec.push_back(priority_group_id);
     }
     void clear_priority_group_id()
@@ -139,14 +156,18 @@ public:
     }
 
     uint32_t get_buffer_profile_id_count() const {return _buf_prof_vec.size();}
-    ndi_obj_id_t get_buffer_profile_id(uint32_t idx) const {
+    nas_obj_id_t get_buffer_profile_id(uint32_t idx) const {
         if (idx < get_buffer_profile_id_count())
             return _buf_prof_vec[idx];
         else
             return 0LL;
     }
-    void add_buffer_profile_id(ndi_obj_id_t buf_prof_id)
+    void add_buffer_profile_id(nas_obj_id_t buf_prof_id)
     {
+        if (std::find(_buf_prof_vec.begin(), _buf_prof_vec.end(), buf_prof_id)
+            != _buf_prof_vec.end())
+            return;
+
         _buf_prof_vec.push_back(buf_prof_id);
     }
 
@@ -161,14 +182,14 @@ public:
         cfg.per_priority_flow_control = bit_vec;
     }
 
-    ndi_obj_id_t get_tc_to_priority_group_map() const { return cfg.tc_to_priority_group_map; }
-    void set_tc_to_priority_group_map(ndi_obj_id_t map_id)
+    nas_obj_id_t get_tc_to_priority_group_map() const { return cfg.tc_to_priority_group_map; }
+    void set_tc_to_priority_group_map(nas_obj_id_t map_id)
     {
         cfg.tc_to_priority_group_map = map_id;
     }
 
-    ndi_obj_id_t get_priority_group_to_pfc_priority_map() const { return cfg.priority_group_to_pfc_priority_map; }
-    void set_priority_group_to_pfc_priority_map(ndi_obj_id_t map_id)
+    nas_obj_id_t get_priority_group_to_pfc_priority_map() const { return cfg.priority_group_to_pfc_priority_map; }
+    void set_priority_group_to_pfc_priority_map(nas_obj_id_t map_id)
     {
         cfg.priority_group_to_pfc_priority_map = map_id;
     }
@@ -200,11 +221,6 @@ inline void nas_qos_port_ingress::set_ndi_port_id(npu_id_t npu_id,
     ndi_port_id.npu_id = npu_id;
     ndi_port_id.npu_port = npu_port_id;
 }
-
-/* This function pre-loads the NAS QoS module with default QoS Port-ingress info
- * @Return standard error code
- */
-t_std_error nas_qos_port_ingress_init();
 
 /* Debugging and unit testing */
 void dump_nas_qos_port_ingress(nas_switch_id_t switch_id);
