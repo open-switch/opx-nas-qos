@@ -2,28 +2,29 @@ Source: opx-nas-qos
 Section: net
 Priority: optional
 Maintainer: Dell EMC <ops-dev@lists.openswitch.net>
-Build-Depends: debhelper (>= 9),dh-autoreconf,dh-systemd,autotools-dev,libopx-common-dev (>= 1.3.0),
-               libopx-cps-dev (>= 3.6.0),libopx-logging-dev (>= 2.0.0),libopx-nas-common-dev (>= 3.3.0),
-               opx-ndi-api-dev (>= 5.5.0),libopx-nas-ndi-dev (>= 3.13.0)
+Build-Depends: debhelper (>= 9),dh-autoreconf,dh-systemd,autotools-dev,libopx-common-dev (>= 1.4.0),
+               libopx-cps-dev (>= 3.6.2),libopx-logging-dev (>= 2.1.0),libopx-nas-common-dev (>= 6.1.0),
+               opx-ndi-api-dev (>= 6.12.0),libopx-nas-ndi-dev (>= 3.26.0)
 Standards-Version: 3.9.3
 Vcs-Browser: https://github.com/open-switch/opx-nas-qos
 Vcs-Git: https://github.com/open-switch/opx-nas-qos.git
 
 Package: libopx-nas-qos1
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common1,libopx-logging1,libopx-nas-common1,libopx-nas-ndi1
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common1 (>= 1.4.0),libopx-logging1 (>= 2.1.0),
+        libopx-nas-common1 (>= 6.1.0),libopx-nas-ndi1 (>= 3.26.0)
 Description: This package contains base QoS functionality for the Openswitch software.
 
 Package: libopx-nas-qos-dev
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common-dev (>= 1.3.0),libopx-cps-dev (>= 3.6.0),
-          libopx-logging-dev (>= 2.0.0),libopx-nas-common-dev (>= 3.3.0),opx-ndi-api-dev (>= 5.5.0),
-          libopx-nas-ndi-dev (>= 3.13.0),libopx-nas-qos1 (=${binary:Version}),
-          libopx-base-model-dev (>= 3.55.0)
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common-dev (>= 1.4.0),libopx-cps-dev (>= 3.6.2),
+          libopx-logging-dev (>= 2.1.0),libopx-nas-common-dev (>= 6.1.0),opx-ndi-api-dev (>= 6.12.0),
+          libopx-nas-ndi-dev (>= 3.26.0),libopx-nas-qos1 (=${binary:Version}),
+          libopx-base-model-dev (>= 3.109.0)
 Description: This package contains base QoS functionality for the Openswitch software.
 
 Package: opx-nas-qos
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, opx-cps (>= 3.6.0), python-opx-cps (>= 3.6.0), 
-          opx-nas-linux (>= 4.8.0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, opx-cps (>= 3.6.2), python-opx-cps (>= 3.6.2), 
+          opx-nas-linux (>= 5.11.0)
 Description: This package contains base QoS functionality for the Openswitch software.
