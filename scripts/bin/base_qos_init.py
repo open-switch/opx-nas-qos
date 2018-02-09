@@ -611,6 +611,9 @@ def init_interfaces(ifnames):
         print lookup_sched_prof
         print lookup_map
 
+    if (lookup_sched_prof == {} or lookup_buf_prof == {} or lookup_map == {}):
+        return
+
     try:
         for xnode_obj in xnode_root:
             if xnode_obj.tag == 'FRONT-PANEL-PORTS':

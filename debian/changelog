@@ -1,3 +1,9 @@
+opx-nas-qos (2.2.0+opx1) unstable; urgency=medium
+
+  * Bugfix: opx-qos-init.service failed when dn_nas_fanout_init_config.xml has fanout config
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Thur, 02 Feb 2018 15:45:18 -0800
+
 opx-nas-qos (2.2.0) unstable; urgency=medium
 
   * Bugfix: fix a bug where buf-profile-id initialized on npu port is not read out to the associated VP
