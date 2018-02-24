@@ -234,7 +234,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_create(
 {
 
     uint_t switch_id = 0;
-    nas_obj_id_t policer_id = 0;
+    nas_obj_id_t policer_id = NAS_QOS_NULL_OBJECT_ID;
     cps_api_return_code_t rc = cps_api_ret_code_OK;
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
@@ -247,7 +247,19 @@ static cps_api_return_code_t nas_qos_cps_api_policer_create(
         return rc;
 
     try {
-        policer_id = p_switch->alloc_policer_id();
+
+        (void) nas_qos_cps_get_switch_and_policer_id(obj, switch_id, policer_id);
+
+        if (policer_id == NAS_QOS_NULL_OBJECT_ID) {
+            policer_id = p_switch->alloc_policer_id();
+        }
+        else {
+            // assign user-specified id
+            if (p_switch->reserve_policer_id(policer_id) != true) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Policer id is being used. Creation failed");
+                return NAS_QOS_E_FAIL;
+            }
+        }
 
         policer.set_policer_id(policer_id);
 
@@ -286,7 +298,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_create(
         if (policer_id)
             p_switch->release_policer_id(policer_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -375,7 +387,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -439,7 +451,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Policer Delete: Unexpected error");
@@ -459,14 +471,12 @@ static cps_api_return_code_t nas_qos_cps_get_switch_and_policer_id(
     cps_api_object_attr_t policer_attr = cps_api_get_key_data(obj, BASE_QOS_METER_ID);
 
     if (policer_attr == NULL) {
-        EV_LOGGING(QOS, NOTICE, "QOS", " policer_attr not exist in message");
+        EV_LOGGING(QOS, DEBUG, "QOS", " policer_attr not exist in message");
         return NAS_QOS_E_MISSING_KEY;
     }
 
     switch_id = 0;
     policer_id = cps_api_object_attr_data_u64(policer_attr);
-
-    //EV_LOGGING(QOS, NOTICE, "QOS", "get switch id: %u, policer_id: %u", switch_id, policer_id);
 
     return cps_api_ret_code_OK;
 

@@ -226,7 +226,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_create(
 {
 
     uint_t switch_id = 0;
-    nas_obj_id_t wred_id = 0;
+    nas_obj_id_t wred_id = NAS_QOS_NULL_OBJECT_ID;
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL)
@@ -238,7 +238,18 @@ static cps_api_return_code_t nas_qos_cps_api_wred_create(
         return NAS_QOS_E_FAIL;
 
     try {
-        wred_id = p_switch->alloc_wred_id();
+        (void) nas_qos_cps_get_switch_and_wred_id(obj, switch_id, wred_id);
+
+        if (wred_id == NAS_QOS_NULL_OBJECT_ID) {
+            wred_id = p_switch->alloc_wred_id();
+        }
+        else {
+               // assign user-specified id
+            if (p_switch->reserve_wred_id(wred_id) != true) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "WRED id is being used. Creation failed");
+                return NAS_QOS_E_FAIL;
+            }
+        }
 
         wred.set_wred_id(wred_id);
 
@@ -270,7 +281,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_create(
         if (wred_id)
             p_switch->release_wred_id(wred_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -340,7 +351,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -406,7 +417,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS WRED Delete: Unexpected error");
@@ -426,13 +437,12 @@ static cps_api_return_code_t nas_qos_cps_get_switch_and_wred_id(
     cps_api_object_attr_t wred_id_attr = cps_api_get_key_data(obj, BASE_QOS_WRED_PROFILE_ID);
 
     if (wred_id_attr == NULL) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "wred id not exist in message");
+        EV_LOGGING(QOS, DEBUG, "QOS", "wred id not exist in message");
         return NAS_QOS_E_MISSING_KEY;
     }
 
     switch_id = 0;
     wred_id = cps_api_object_attr_data_u64(wred_id_attr);
-    //EV_LOGGING(QOS, NOTICE, "QOS", "get switch id: %u, wred_id: %u", switch_id, wred_id);
 
     return cps_api_ret_code_OK;
 

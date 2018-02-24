@@ -77,31 +77,37 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
         case BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_TC_TO_QUEUE);
             port_eg.set_tc_to_queue_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_TC_TO_DOT1P);
             port_eg.set_tc_to_dot1p_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_TC_TO_DSCP);
             port_eg.set_tc_to_dscp_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DOT1P_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_TC_COLOR_TO_DOT1P);
             port_eg.set_tc_color_to_dot1p_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DSCP_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_TC_COLOR_TO_DSCP);
             port_eg.set_tc_color_to_dscp_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP:
             lval = cps_api_object_attr_data_u64(it.attr);
             port_eg.mark_attr_dirty(id);
+            lval = ENCODE_LOCAL_MAP_ID_AND_TYPE(lval, NDI_QOS_MAP_PFC_TO_QUEUE);
             port_eg.set_pfc_priority_to_queue_map(lval);
             break;
         case BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST:
@@ -163,27 +169,27 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_tc_to_queue_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_tc_to_queue_map()));
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_tc_to_dot1p_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_tc_to_dot1p_map()));
             break;
         case BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_tc_to_dscp_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_tc_to_dscp_map()));
             break;
         case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DOT1P_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_tc_color_to_dot1p_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_tc_color_to_dot1p_map()));
             break;
         case BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DSCP_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_tc_color_to_dscp_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_tc_color_to_dscp_map()));
             break;
         case BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP:
             cps_api_object_attr_add_u64(obj, attr_id,
-                                    port_eg.get_pfc_priority_to_queue_map());
+                    GET_LOCAL_MAP_ID(port_eg.get_pfc_priority_to_queue_map()));
             break;
         case BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST:
             for (uint_t i= 0; i< port_eg.get_buffer_profile_id_count(); i++) {
@@ -536,7 +542,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_eg_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS PORT EGRESS Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -665,17 +671,17 @@ cps_api_return_code_t nas_qos_cps_api_port_egress_read(void * context,
                                     port_eg->get_queue_id(idx));
     }
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_TC_TO_QUEUE_MAP,
-                                port_eg->get_tc_to_queue_map());
+            GET_LOCAL_MAP_ID(port_eg->get_tc_to_queue_map()));
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_TC_TO_DOT1P_MAP,
-                                port_eg->get_tc_to_dot1p_map());
+            GET_LOCAL_MAP_ID(port_eg->get_tc_to_dot1p_map()));
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_TC_TO_DSCP_MAP,
-                                port_eg->get_tc_to_dscp_map());
+            GET_LOCAL_MAP_ID(port_eg->get_tc_to_dscp_map()));
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DOT1P_MAP,
-                                port_eg->get_tc_color_to_dot1p_map());
+            GET_LOCAL_MAP_ID(port_eg->get_tc_color_to_dot1p_map()));
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_TC_COLOR_TO_DSCP_MAP,
-                                port_eg->get_tc_color_to_dscp_map());
+            GET_LOCAL_MAP_ID(port_eg->get_tc_color_to_dscp_map()));
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP,
-                                port_eg->get_pfc_priority_to_queue_map());
+            GET_LOCAL_MAP_ID(port_eg->get_pfc_priority_to_queue_map()));
     for (idx = 0; idx < port_eg->get_buffer_profile_id_count(); idx++) {
         cps_api_object_attr_add_u64(ret_obj, BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST,
                                     port_eg->get_buffer_profile_id(idx));

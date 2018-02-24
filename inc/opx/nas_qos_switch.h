@@ -107,7 +107,7 @@ class nas_qos_switch : public nas::base_switch_t
     /************  Schedulers ********************************/
     scheduler_list_t     schedulers;
 
-    static const size_t NAS_QOS_SCHEDULER_ID_MAX = 0xffff;
+    static const size_t NAS_QOS_SCHEDULER_ID_MAX = 2000;
 
     nas::id_generator_t  _scheduler_id_gen {NAS_QOS_SCHEDULER_ID_MAX};
 
@@ -121,7 +121,8 @@ class nas_qos_switch : public nas::base_switch_t
     /************* Maps *************************************/
     map_list_t     maps;
 
-    static const size_t NAS_QOS_MAP_ID_MAX = 1000;
+    // NAS MAP_ID is a 12-bit encoded value to include map-type
+    static const size_t NAS_QOS_MAP_ID_MAX = 2048;
 
     nas::id_generator_t  _map_id_gen {NAS_QOS_MAP_ID_MAX};
 
@@ -187,6 +188,8 @@ public:
 
     nas_obj_id_t alloc_policer_id () {return _policer_id_gen.alloc_id ();}
 
+    bool reserve_policer_id(nas_obj_id_t id) {return _policer_id_gen.reserve_id(id);}
+
     void release_policer_id(nas_obj_id_t id) {_policer_id_gen.release_id(id);}
 
     policer_iter_t get_policer_it_begin() {return policers.begin();}
@@ -201,6 +204,8 @@ public:
     nas_qos_wred* get_wred (nas_obj_id_t wred_id);
 
     nas_obj_id_t alloc_wred_id () {return _wred_id_gen.alloc_id ();}
+
+    bool reserve_wred_id(nas_obj_id_t id) {return _wred_id_gen.reserve_id(id);}
 
     void release_wred_id(nas_obj_id_t id) {_wred_id_gen.release_id(id);}
 
@@ -244,6 +249,8 @@ public:
 
     nas_obj_id_t alloc_scheduler_id () {return _scheduler_id_gen.alloc_id ();}
 
+    bool reserve_scheduler_id(nas_obj_id_t id) {return _scheduler_id_gen.reserve_id(id);}
+
     void release_scheduler_id(nas_obj_id_t id) {_scheduler_id_gen.release_id(id);}
 
     scheduler_iter_t get_scheduler_it_begin() {return schedulers.begin();}
@@ -277,7 +284,9 @@ public:
 
     nas_qos_map* get_map (nas_obj_id_t map_id);
 
-    nas_obj_id_t alloc_map_id () {return _map_id_gen.alloc_id ();}
+    nas_obj_id_t alloc_map_id_by_type (nas_qos_map_type_t map_type);
+
+    bool reserve_map_id(nas_obj_id_t id) {return _map_id_gen.reserve_id(id);}
 
     void release_map_id(nas_obj_id_t id) {_map_id_gen.release_id(id);}
 
@@ -293,6 +302,8 @@ public:
 
     nas_obj_id_t alloc_buffer_pool_id () {return _buffer_pool_id_gen.alloc_id ();}
 
+    bool reserve_buffer_pool_id(nas_obj_id_t id) {return _buffer_pool_id_gen.reserve_id(id);}
+
     void release_buffer_pool_id(nas_obj_id_t id) {_buffer_pool_id_gen.release_id(id);}
 
     buffer_pool_iter_t get_buffer_pool_it_begin() {return buffer_pools.begin();}
@@ -306,6 +317,8 @@ public:
     nas_qos_buffer_profile* get_buffer_profile (nas_obj_id_t buffer_profile_id);
 
     nas_obj_id_t alloc_buffer_profile_id () {return _buffer_profile_id_gen.alloc_id ();}
+
+    bool reserve_buffer_profile_id(nas_obj_id_t id) {return _buffer_profile_id_gen.reserve_id(id);}
 
     void release_buffer_profile_id(nas_obj_id_t id) {_buffer_profile_id_gen.release_id(id);}
 

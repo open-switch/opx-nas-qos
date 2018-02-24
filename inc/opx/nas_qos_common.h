@@ -79,6 +79,24 @@
 
 typedef ndi_qos_map_type_t nas_qos_map_type_t;
 
+// NAS MAP-ID encoding: Map-type (5-bit) + Per-type Map-id (7-bit)
+#define MAX_MAP_ID_PER_TYPE     127     // 0 is reserved, 1..127 are available
+#define MAX_MAP_TYPES           32
+#define MAP_ID_BIT_MASK         (0x7F)  // Per-type map-id bits
+#define MAP_TYPE_POS            7       // starting from 8th bit (ie. bit-7 in 0..7)
+#define MAP_TYPE_BIT_MASK       (0x1F << MAP_TYPE_POS)
+
+// Encode map-type and per-type map-id into a unique NAS map-id
+#define ENCODE_LOCAL_MAP_ID_AND_TYPE(map_id, map_type) \
+            (map_id == 0? NAS_QOS_NULL_OBJECT_ID : \
+             (((map_type) << (MAP_TYPE_POS)) | (map_id & MAP_ID_BIT_MASK)))
+
+// Get the per-type map-id, which is used by CPS YANG model application
+#define GET_LOCAL_MAP_ID(map_id)         (map_id & MAP_ID_BIT_MASK)
+#define GET_LOCAL_MAP_TYPE(map_id)       ((map_id & MAP_TYPE_BIT_MASK) >> MAP_TYPE_POS)
+#define MAP_ID_IS_UNSPECIFIED(map_id)    (GET_LOCAL_MAP_ID(map_id) == 0)
+
+
 // Making complex keys
 #define MAKE_KEY(key1, key2)     (((key2) << 16) | (key1))
 #define GET_KEY1(key)            (((key).any) & 0xFFFF)

@@ -95,6 +95,8 @@ static cps_api_return_code_t nas_qos_cps_get_priority_group_info(
     if (p_switch == NULL)
         return NAS_QOS_E_FAIL;
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     uint_t count = p_switch->get_number_of_port_priority_groups(port_id);
 
     if  (count == 0) {
@@ -105,7 +107,6 @@ static cps_api_return_code_t nas_qos_cps_get_priority_group_info(
         return NAS_QOS_E_FAIL;
     }
 
-    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     std::vector<nas_qos_priority_group *> pg_list(count);
     p_switch->get_port_priority_groups(port_id, count, &pg_list[0]);
 
@@ -318,7 +319,7 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS priority_group Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",

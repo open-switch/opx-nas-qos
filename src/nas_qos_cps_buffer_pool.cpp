@@ -224,7 +224,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
 {
 
     uint_t switch_id = 0;
-    nas_obj_id_t buffer_pool_id = 0;
+    nas_obj_id_t buffer_pool_id = NAS_QOS_NULL_OBJECT_ID;
     cps_api_return_code_t rc = cps_api_ret_code_OK;
 
    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
@@ -237,7 +237,18 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
         return rc;
 
     try {
-        buffer_pool_id = p_switch->alloc_buffer_pool_id();
+        (void)nas_qos_cps_get_switch_and_buffer_pool_id(obj, switch_id, buffer_pool_id);
+
+        if (buffer_pool_id == NAS_QOS_NULL_OBJECT_ID) {
+            buffer_pool_id = p_switch->alloc_buffer_pool_id();
+        }
+        else {
+            // assign user-specified id
+            if (p_switch->reserve_buffer_pool_id(buffer_pool_id) != true) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool id is being used. Creation failed");
+                return NAS_QOS_E_FAIL;
+            }
+        }
 
         buffer_pool.set_buffer_pool_id(buffer_pool_id);
 
@@ -269,7 +280,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
         if (buffer_pool_id)
             p_switch->release_buffer_pool_id(buffer_pool_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -341,7 +352,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -408,7 +419,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Delete: Unexpected error");
@@ -427,7 +438,7 @@ static cps_api_return_code_t nas_qos_cps_get_switch_and_buffer_pool_id(
     cps_api_object_attr_t buffer_pool_id_attr = cps_api_get_key_data(obj, BASE_QOS_BUFFER_POOL_ID);
 
     if (buffer_pool_id_attr == NULL) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_pool id not exist in message");
+        EV_LOGGING(QOS, DEBUG, "QOS", "buffer_pool id not exist in message");
         return NAS_QOS_E_MISSING_KEY;
     }
 

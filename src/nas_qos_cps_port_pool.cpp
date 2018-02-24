@@ -369,7 +369,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_create(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS port_pool Create error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -443,7 +443,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS port_pool Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -516,7 +516,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS port_pool Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS port_pool Delete: Unexpected error");

@@ -1044,4 +1044,19 @@ nas_obj_id_t nas_qos_switch::ndi2nas_priority_group_id(ndi_obj_id_t ndi_obj_id)
     return 0;
 }
 
+nas_obj_id_t nas_qos_switch::alloc_map_id_by_type (nas_qos_map_type_t map_type)
+{
+    uint64_t map_id = 0;
+
+    for (uint8_t local_id = 1; local_id < MAX_MAP_ID_PER_TYPE; local_id++) {
+        map_id = ENCODE_LOCAL_MAP_ID_AND_TYPE(local_id, map_type);
+        if (_map_id_gen.reserve_id(map_id) == false)
+            continue;
+
+        return map_id;
+
+    }
+
+    throw nas::base_exception {NAS_BASE_E_FULL, __PRETTY_FUNCTION__, "No more free IDs"};
+}
 

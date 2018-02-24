@@ -145,6 +145,9 @@ cps_api_return_code_t nas_qos_cps_api_map_read_type (void * context,
     cps_api_object_attr_t map_attr = cps_api_get_key_data(obj, obj_id);
     nas_obj_id_t map_id = (map_attr? cps_api_object_attr_data_u64(map_attr): 0);
 
+    // convert locally-unique map-id per type to global unique map-id in NAS
+    map_id = ENCODE_LOCAL_MAP_ID_AND_TYPE(map_id, map_type);
+
     // check the request is on Map level or Entry level
     bool is_map_entry;
     cps_api_return_code_t rc = cps_api_ret_code_OK;
@@ -214,7 +217,7 @@ cps_api_return_code_t nas_qos_cps_api_map_read_type (void * context,
         return NAS_QOS_E_FAIL;
 
     nas_qos_map * map;
-    if (map_id) {
+    if (!MAP_ID_IS_UNSPECIFIED(map_id)) {
         map = p_switch->get_map(map_id);
         if (map == NULL)
             return NAS_QOS_E_FAIL;
@@ -272,6 +275,8 @@ static cps_api_return_code_t _append_one_map(cps_api_get_params_t * param,
 
     obj_id = qos_map_map_id_obj_id(map_type);
     nas_obj_id_t map_id = map->get_map_id();
+    // convert NAS MAP ID back to local map id per-type before return to CPS-API user
+    map_id = GET_LOCAL_MAP_ID(map_id);
     cps_api_set_key_data(ret_obj, obj_id,
             cps_api_object_ATTR_T_U64,
             &map_id, sizeof(uint64_t));
@@ -344,8 +349,8 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
 
     }
     else {
-        if ((rc = qos_map_get_switch_id(obj, map_type, switch_id)) != cps_api_ret_code_OK)
-            return rc;
+        // tentative get switch_id or map_id in case user provides them.
+        (void)qos_map_get_key(obj, map_type, switch_id, map_id);
 
         // while creating map id, do not accept map-entry attributes.
         // Map-entry needs to be created separately.
@@ -354,7 +359,11 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
                 "Inner list map entries must be created separately after map id is created\n");
             return NAS_QOS_E_INCONSISTENT;
         }
+
     }
+
+    // convert locally-unique map-id per type to global unique map-id in NAS
+    map_id = ENCODE_LOCAL_MAP_ID_AND_TYPE(map_id, map_type);
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL)
@@ -363,13 +372,20 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
     try {
         if (!is_map_entry) {
             // Map id create
-
             nas_qos_map map(p_switch, map_type);
 
-            map_id = p_switch->alloc_map_id();
+            if (MAP_ID_IS_UNSPECIFIED(map_id)) {
+                map_id = p_switch->alloc_map_id_by_type(map_type);
+            }
+            else {
+                // assign user-specified id
+                if (p_switch->reserve_map_id(map_id) != true) {
+                    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "map id is being used. Creation failed");
+                    return NAS_QOS_E_FAIL;
+                }
+            }
 
             map.set_map_id(map_id);
-
             map.commit_create(sav_obj? false: true);
 
             p_switch->add_map(map);
@@ -379,10 +395,12 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
 
             // update obj with new map-id attr and key
             nas_attr_id_t map_id_obj_id = qos_map_map_id_obj_id(map_type);
+            // convert NAS MAP ID back to local map id per-type before return to CPS-API user
+            uint64_t local_map_id = GET_LOCAL_MAP_ID(map_id);
             cps_api_set_key_data(obj,
                     map_id_obj_id,
                     cps_api_object_ATTR_T_U64,
-                    &map_id, sizeof(uint64_t));
+                    &local_map_id, sizeof(uint64_t));
 
             // save for rollback if caller requests it.
             if (sav_obj) {
@@ -440,7 +458,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
         if (!is_map_entry && map_id)
             p_switch->release_map_id(map_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -473,6 +491,9 @@ static cps_api_return_code_t nas_qos_cps_api_map_set(
         // map key ok, setting map attributes instead of map-entry attr.
         map_set = true;
     }
+
+    // convert locally-unique map-id per type to global unique map-id in NAS
+    map_id = ENCODE_LOCAL_MAP_ID_AND_TYPE(map_id, map_type);
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL)
@@ -556,7 +577,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -593,6 +614,9 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
         if ((rc = qos_map_get_key(obj, map_type, switch_id, map_id)) != cps_api_ret_code_OK)
             return rc;
     }
+
+    // convert locally-unique map-id per type to global unique map-id in NAS
+    map_id = ENCODE_LOCAL_MAP_ID_AND_TYPE(map_id, map_type);
 
     nas_qos_map * map_p = nas_qos_cps_get_map(switch_id, map_id);
     if (map_p == NULL) {
@@ -670,7 +694,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (std::out_of_range&) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Map Delete failed: Out of range");
@@ -746,6 +770,8 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
             cps_api_qualifier_TARGET);
 
     obj_id = qos_map_map_id_obj_id(map_type);
+    // convert NAS MAP ID back to local map id per-type before return to CPS-API user
+    map_id = GET_LOCAL_MAP_ID(map_id);
     cps_api_set_key_data(obj,
             obj_id,
             cps_api_object_ATTR_T_U64,
@@ -780,6 +806,8 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
             cps_api_qualifier_TARGET);
 
     obj_id = qos_map_map_id_obj_id(map_type);
+    // convert NAS MAP ID back to local map id per-type before return to CPS-API user
+    map_id = GET_LOCAL_MAP_ID(map_id);
     cps_api_set_key_data(obj,
             obj_id,
             cps_api_object_ATTR_T_U64,

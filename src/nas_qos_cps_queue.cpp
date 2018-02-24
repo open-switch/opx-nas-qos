@@ -112,6 +112,8 @@ static cps_api_return_code_t nas_qos_cps_get_queue_info(
     if (p_switch == NULL)
         return NAS_QOS_E_FAIL;
 
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     uint_t count = p_switch->get_number_of_port_queues(port_id);
 
     if  (count == 0) {
@@ -122,7 +124,6 @@ static cps_api_return_code_t nas_qos_cps_get_queue_info(
         return NAS_QOS_E_FAIL;
     }
 
-    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     std::vector<nas_qos_queue *> q_list(count);
     p_switch->get_port_queues(port_id, count, &q_list[0]);
 
@@ -355,7 +356,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_create(
         if (queue_id)
             p_switch->release_queue_id(queue_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -468,7 +469,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS queue Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -547,7 +548,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS QUEUE Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS QUEUE Delete: Unexpected error");

@@ -812,7 +812,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
         if (scheduler_group_id)
             p_switch->release_scheduler_group_id(scheduler_group_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -926,7 +926,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -1005,7 +1005,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS SCHEDULER_GROUP Delete: Unexpected error");

@@ -217,7 +217,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
                                 cps_api_object_t obj,
                                 cps_api_object_list_t sav_obj)
 {
-    nas_obj_id_t scheduler_id = 0;
+    nas_obj_id_t scheduler_id = NAS_QOS_NULL_OBJECT_ID;
 
     uint32_t switch_id = 0;
 
@@ -231,7 +231,20 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
         return NAS_QOS_E_FAIL;
 
     try {
-        scheduler_id = p_switch->alloc_scheduler_id();
+        cps_api_object_attr_t scheduler_attr = cps_api_get_key_data(obj, BASE_QOS_SCHEDULER_PROFILE_ID);
+        if (scheduler_attr)
+            scheduler_id = cps_api_object_attr_data_u64(scheduler_attr);
+
+        if (scheduler_id == NAS_QOS_NULL_OBJECT_ID) {
+            scheduler_id = p_switch->alloc_scheduler_id();
+        }
+        else {
+               // assign user-specified id
+            if (p_switch->reserve_scheduler_id(scheduler_id) != true) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler id is being used. Creation failed");
+                return NAS_QOS_E_FAIL;
+            }
+        }
 
         scheduler.set_scheduler_id(scheduler_id);
 
@@ -263,7 +276,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
         if (scheduler_id)
             p_switch->release_scheduler_id(scheduler_id);
 
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -332,7 +345,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_set(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Attr Modify error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
 
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -400,7 +413,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_delete(
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Delete error code: %d ",
                     e.err_code);
-        return NAS_QOS_E_FAIL;
+        return e.err_code;
     } catch (...) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS Scheduler Delete: Unexpected error");

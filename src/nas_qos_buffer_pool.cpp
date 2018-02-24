@@ -117,7 +117,7 @@ bool nas_qos_buffer_pool::push_create_obj_to_npu (npu_id_t npu_id,
         EV_LOGGING(QOS, ERR, "QOS-Pool",
                 "Shadow buffer_pools get failed on ndi_pool_id 0x%016lx",
                 ndi_buffer_pool_id);
-        throw nas::base_exception {rc, __PRETTY_FUNCTION__,
+        throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
             "NDI QoS buffer_pool Create Failed on Shadow Pool caching"};
     }
 
