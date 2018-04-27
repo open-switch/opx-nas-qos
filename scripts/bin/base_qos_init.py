@@ -268,8 +268,10 @@ def init_sched_tree_on_port(xnode_sched_tree, lookup_sched_prof, lookup_buf_prof
             # Queues
             for xnode_queue in xnode_level:
                 queue_number = int(xnode_queue.attrib['number'])
-                scheduler_profile_name = xnode_queue.attrib['scheduler-profile']
-                scheduler_profile_id = lookup_sched_prof[scheduler_profile_name]
+                scheduler_profile_id = 0
+                if ('scheduler-profile' in xnode_queue.attrib):
+                    scheduler_profile_name = xnode_queue.attrib['scheduler-profile']
+                    scheduler_profile_id = lookup_sched_prof[scheduler_profile_name]
 
                 buffer_profile_id = 0
                 if (lookup_buf_prof != {}):
@@ -430,7 +432,8 @@ def bind_q_profile(key_tuple, scheduler_profile_id, buffer_profile_id):
         'queue-number': key_tuple[2],
     }
     q_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
-    q_obj.set_attr('scheduler-profile-id', scheduler_profile_id)
+    if (scheduler_profile_id):
+        q_obj.set_attr('scheduler-profile-id', scheduler_profile_id)
     if (buffer_profile_id):
         q_obj.set_attr('buffer-profile-id', buffer_profile_id)
 
