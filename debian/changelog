@@ -1,3 +1,10 @@
+opx-nas-qos (2.2.0+opx4) unstable; urgency=medium
+
+  * Feature: Added ability to run base_qos_init.py script multiple times
+  * Update: Added schema for configuration file for base_qos_init.py
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Mon, 11 Jun 2018 14:30:00 -0800
+
 opx-nas-qos (2.2.0+opx3) unstable; urgency=medium
 
   * Bugfix: Changes to support Dell S5148F-ON
