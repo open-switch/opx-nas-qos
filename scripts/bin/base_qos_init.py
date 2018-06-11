@@ -85,10 +85,52 @@ def init_switch_globals(xnode_glb, lookup_map, lookup_sched_prof, lookup_buf_pro
             lookup_buf_prof[prof_name] =  buf_prof_id
 
 
+def init_fp_port(obj, lookup_map, lookup_sched_prof, lookup_buf_prof):
+    obj = cps_object.CPSObject(obj=ifs[d[ifname]])
+    try:
+        iftype = obj.get_attr_data('if/interfaces/interface/type')
+    except ValueError:
+        return
+    if iftype != 'ianaift:ethernetCsmacd':
+        return
+    ifidx = obj.get_attr_data('dell-base-if-cmn/if/interfaces/interface/if-index')
+    max_speed = get_max_speed(obj)
+    init_port(ifidx, ifname, iftype, max_speed, xnode_port, lookup_map, lookup_sched_prof, lookup_buf_prof)
+
 
 def init_fp_ports(xnode_fp, lookup_map, lookup_sched_prof, lookup_buf_prof):
-    init_all_ports_of_type('ianaift:ethernetCsmacd', xnode_fp, lookup_map, lookup_sched_prof, lookup_buf_prof)
-
+    # Be backward compatible
+    if 'port' not in map(lambda x: x.tag, xnode_fp.getchildren()):
+        init_all_ports_of_type('ianaift:ethernetCsmacd', xnode_fp, lookup_map, lookup_sched_prof, lookup_buf_prof)
+        return
+    ifs = nas_os_if_utils.nas_os_if_list()
+    ifnames = map(lambda x: cps_object.CPSObject(obj=x).get_attr_data('if/interfaces/interface/name'), ifs)
+    d = {}
+    for i in range(0, len(ifnames)):
+        d[ifnames[i]] = i
+    ifnames.sort()
+    for xnode_port in xnode_fp:
+        if xnode_port.tag != 'port':
+            continue
+        if 'port' in xnode_port.attrib:
+            # Single port
+            ifname = xnode_port.attrib['port']
+            if ifname not in ifnames:
+                continue
+            init_fp_port(cps_object.CPSObject(obj=ifs[d[ifname]]), lookup_map, lookup_sched_prof, lookup_buf_prof)
+            continue
+        if 'from' in xnode_port.attrib and 'to' in xnode_port.attrib:
+            # Range of ports
+            _from = xnode_port.attrib['from']
+            _to = xnode_port.attrib['to']
+            if _from not in ifnames or _to not in ifnames:
+                continue
+            i = ifnames.index(_from)
+            j = ifnames.index(_to)
+            while i <= j:
+                init_fp_port(cps_object.CPSObject(obj=ifs[d[ifnames[i]]]), lookup_map, lookup_sched_prof, lookup_buf_prof)
+                i = i + 1
+            
 
 def init_cpu_ports(xnode_cpu, lookup_map, lookup_sched_prof, lookup_buf_prof):
     init_all_ports_of_type('base-if:cpu', xnode_cpu, lookup_map, lookup_sched_prof, lookup_buf_prof)
@@ -660,9 +702,195 @@ def init_default_buffer_pool(pool_type, size):
 
     return buffer_pool_id
 
+# CPS helper functions
+
+def cps_get(obj, qual, data, resp):
+    return (cps.get([cps_object.CPSObject(obj,
+                                          qual=qual,
+                                          data=data,
+                                      ).get()
+                 ], resp
+                )
+        )
+
+def cps_set(obj, qual, data):
+    return (cps_utils.CPSTransaction([('set', cps_object.CPSObject(
+        obj,
+        qual=qual,
+        data=data
+    ).get()
+                                   )
+                                  ]
+                                 ).commit()
+    )
+
+def cps_delete(obj, qual, data):
+    return (cps_utils.CPSTransaction([('delete', cps_object.CPSObject(
+        obj,
+        qual=qual,
+        data=data
+    ).get()
+                                   )
+                                  ]
+                                 ).commit()
+    )
+
+# Delete any existing QoS configuration for interface
+
+def iface_config_clear():
+    ifs = nas_os_if_utils.nas_os_if_list() + nas_os_if_utils.nas_os_cpu_if()
+
+    # For each interface, ...
+    for iface in ifs:
+        ifidx = cps_object.CPSObject(obj=iface).get_attr_data(
+            'dell-base-if-cmn/if/interfaces/interface/if-index'
+        )
+        # Set all ingress maps to none
+        cps_set('base-qos/port-ingress',
+                'target',
+                {'base-qos/port-ingress/port-id': ifidx,
+                 'base-qos/port-ingress/dot1p-to-color-map': 0,
+                 'base-qos/port-ingress/dscp-to-tc-map': 0,
+                 'base-qos/port-ingress/priority-group-to-pfc-priority-map': 0,
+                 'base-qos/port-ingress/tc-to-queue-map': 0,
+                 'base-qos/port-ingress/dot1p-to-tc-color-map': 0,
+                 'base-qos/port-ingress/dot1p-to-tc-map': 0,
+                 'base-qos/port-ingress/tc-to-priority-group-map': 0,
+                 'base-qos/port-ingress/dscp-to-tc-color-map': 0,
+                 'base-qos/port-ingress/dscp-to-color-map': 0
+             }
+                )
+        # Set all egress maps and scheduler profile to none
+        cps_set('base-qos/port-egress',
+                'target',
+                {'base-qos/port-egress/port-id': ifidx,
+                 'base-qos/port-egress/pfc-priority-to-queue-map': 0,
+                 'base-qos/port-egress/tc-to-dot1p-map': 0,
+                 'base-qos/port-egress/tc-color-to-dscp-map': 0,
+                 'base-qos/port-egress/tc-color-to-dot1p-map': 0,
+                 'base-qos/port-egress/tc-to-queue-map': 0,
+                 'base-qos/port-egress/tc-to-dscp-map': 0,
+                 'base-qos/port-egress/scheduler-profile-id': 0
+             }
+                )
+        # For each priority group, ...
+        resp = []
+        cps_get('base-qos/priority-group',
+                'target',
+                {'base-qos/priority-group/port-id': ifidx},
+                resp
+        )
+        for r in resp:
+            # Set buffer profile to none
+            cps_set('base-qos/priority-group',
+                    'target',
+                    {'base-qos/priority-group/port-id': ifidx,
+                     'base-qos/priority-group/local-id':
+                     cps_object.CPSObject(obj=r).get_attr_data(
+                         'base-qos/priority-group/local-id'
+                     ),
+                     'base-qos/priority-group/buffer-profile-id': 0
+                 }
+                )
+        # For each queue, ...
+        resp = []
+        cps_get('base-qos/queue',
+                'target',
+                {'base-qos/queue/port-id': ifidx},
+                resp
+        )
+        for r in resp:
+            # Set scheduler and buffer profile to none
+            robj = cps_object.CPSObject(obj=r)
+            cps_set('base-qos/queue',
+                    'target',
+                    {'base-qos/queue/port-id': ifidx,
+                     'base-qos/queue/queue-number':
+                     robj.get_attr_data('base-qos/queue/queue-number'),
+                     'base-qos/queue/type':
+                     robj.get_attr_data('base-qos/queue/type'),
+                     'base-qos/queue/scheduler-profile-id': 0,
+                     'base-qos/queue/buffer-profile-id': 0
+                 }
+                )
+        # For each scheduler group, ...
+        resp = []
+        cps_get('base-qos/scheduler-group',
+                'target',
+                {'base-qos/scheduler-group/port-id': ifidx},
+                resp
+        )
+        for r in resp:
+            # Set scheduler profile to none
+            robj = cps_object.CPSObject(obj=r)
+            cps_set('base-qos/scheduler-group',
+                    'target',
+                    {'base-qos/scheduler-group/id':
+                     robj.get_attr_data('base-qos/scheduler-group/id'),
+                     'base-qos/scheduler-group/scheduler-profile-id': 0
+                 }
+            )
+
+# Delete all mappings
+
+def map_config_clear():
+    for m in ('dot1p-to-color-map',
+              'dscp-to-tc-map',
+              'priority-group-to-pfc-priority-map',
+              'dot1p-to-tc-color-map',
+              'dot1p-to-tc-map',
+              'tc-to-priority-group-map',
+              'dscp-to-tc-color-map',
+              'dscp-to-color-map',
+              'pfc-priority-to-queue-map',
+              'tc-to-dot1p-map',
+              'tc-to-queue-map',
+              'tc-to-dscp-map'
+              ):
+        objname = 'base-qos/' + m
+        objkey = objname + '/id'
+        entname = objname + '/entry'
+        resp = []
+        cps_get(objname, 'target', {}, resp)
+        for r in resp:
+            robj = cps_object.CPSObject(obj=r)
+            _id = robj.get_attr_data(objkey)
+            if entname in r['data']:
+                # Delete all entries
+                entries = robj.get_attr_data('entry').items()
+                for e in entries:
+                    d = {objkey: _id}
+                    for k in e[1].items():
+                        d[entname + '/' + k[0]] = k[1]
+                    cps_delete(entname, 'target', d)
+            # Delete map
+            cps_delete(objname, 'target', {objkey: _id})
+
+# Delete miscellaneous QoS configuration objects
+
+def misc_config_clear():
+    # Delete all buffer profiles, buffer pools and scheduler profiles
+    for _obj in ('buffer-profile', 'buffer-pool', 'scheduler-profile'):
+        objname = 'base-qos/' + _obj
+        k = objname + '/id'
+        resp = []
+        cps_get(objname, 'target', {}, resp)
+        for r in resp:
+            cps_delete(objname,
+                       'target',
+                       {k: cps_object.CPSObject(obj=r).get_attr_data(k)}
+            )
+
+# Delete any existing QoS configuration
+
+def config_clear():
+    iface_config_clear()
+    map_config_clear()
+    misc_config_clear()
 
 
 if __name__ == '__main__':
+    config_clear()
 
     if 'DN_QOS_CFG_PATH' in os.environ.keys():
         qos_cfg_path = os.environ['DN_QOS_CFG_PATH']
@@ -676,7 +904,6 @@ if __name__ == '__main__':
     lookup_map = {}
     lookup_sched_prof = {}
     lookup_buf_prof = {}
-
 
     try:
         for xnode_obj in xnode_root:
