@@ -34,6 +34,43 @@
 
 class nas_qos_switch;
 
+typedef struct nas_qos_wred_struct{
+    bool    g_enable;        // WRED enabled/disabled on green traffic
+    uint_t  g_min;          // WRED min threshold for green traffic
+    uint_t  g_max;          // WRED max threshold for green traffic
+    uint_t  g_drop_prob;    // Green traffic drop probability when min-threshold is crossed
+
+    bool    y_enable;       // WRED enabled/disabled on yellow traffic
+    uint_t  y_min;          // WRED min threshold for yellow traffic
+    uint_t  y_max;          // WRED max threshold for yellow traffic
+    uint_t  y_drop_prob;    // Yellow traffic drop probability when min-threshold is crossed
+
+    bool    r_enable;       // WRED enabled/disabled on red traffic
+    uint_t  r_min;          // WRED min threshold for red traffic
+    uint_t  r_max;          // WRED max threshold for red traffic
+    uint_t  r_drop_prob;    // Red traffic drop probability when min-threshold is crossed
+
+    uint_t  ecn_g_min;      // ECN min threshold for green traffic
+    uint_t  ecn_g_max;      // ECN max threshold for green traffic
+    uint_t  ecn_g_prob;     // Green traffic ECN-mark probability when min-threshold is crossed
+
+    uint_t  ecn_y_min;      // ECN min threshold for yellow traffic
+    uint_t  ecn_y_max;      // ECN max threshold for yellow traffic
+    uint_t  ecn_y_prob;     // Yellow traffic ECN-mark probability when min-threshold is crossed
+
+    uint_t  ecn_r_min;      // ECN min threshold for red traffic
+    uint_t  ecn_r_max;      // ECN max threshold for red traffic
+    uint_t  ecn_r_prob;     // Red traffic ECN-mark probability when min-threshold is crossed
+
+    uint_t  ecn_c_min;      // ECN min threshold for colorless traffic
+    uint_t  ecn_c_max;      // ECN max threshold for colorless traffic
+    uint_t  ecn_c_prob;     // Colorless traffic ECN-mark probability when min-threshold is crossed
+
+    uint_t  weight;         // Weight factor to calculate the average queue size based on historic average
+    BASE_QOS_ECN_MARK_MODE_t ecn_mark;          // ECN marking mode
+}nas_qos_wred_struct_t;
+
+
 class nas_qos_wred : public nas::base_obj_t
 {
 
@@ -41,7 +78,7 @@ class nas_qos_wred : public nas::base_obj_t
     nas_obj_id_t wred_id;
 
     // attributes
-    qos_wred_struct_t cfg;
+    nas_qos_wred_struct_t cfg;
 
     ///// Typedefs /////
     typedef std::unordered_map <npu_id_t, ndi_obj_id_t> ndi_obj_id_map_t;
@@ -95,6 +132,42 @@ public:
     uint_t  get_r_drop_prob()  const  {return cfg.r_drop_prob;}
     void    set_r_drop_prob(uint_t val) {cfg.r_drop_prob = val;}
 
+    uint_t  get_ecn_g_min()  const  {return cfg.ecn_g_min;}
+    void    set_ecn_g_min(uint_t val) {cfg.ecn_g_min = val;}
+
+    uint_t  get_ecn_g_max()  const  {return cfg.ecn_g_max;}
+    void    set_ecn_g_max(uint_t val) {cfg.ecn_g_max = val;}
+
+    uint_t  get_ecn_g_prob() const   {return cfg.ecn_g_prob;}
+    void    set_ecn_g_prob(uint_t val) {cfg.ecn_g_prob = val;}
+
+    uint_t  get_ecn_y_min() const   {return cfg.ecn_y_min;}
+    void    set_ecn_y_min(uint_t val) {cfg.ecn_y_min = val;}
+
+    uint_t  get_ecn_y_max()  const  {return cfg.ecn_y_max;}
+    void    set_ecn_y_max(uint_t val) {cfg.ecn_y_max = val;}
+
+    uint_t  get_ecn_y_prob() const   {return cfg.ecn_y_prob;}
+    void    set_ecn_y_prob(uint_t val) {cfg.ecn_y_prob = val;}
+
+    uint_t  get_ecn_r_min() const   {return cfg.ecn_r_min;}
+    void    set_ecn_r_min(uint_t val) {cfg.ecn_r_min = val;}
+
+    uint_t  get_ecn_r_max() const   {return cfg.ecn_r_max;}
+    void    set_ecn_r_max(uint_t val) {cfg.ecn_r_max = val;}
+
+    uint_t  get_ecn_r_prob()  const  {return cfg.ecn_r_prob;}
+    void    set_ecn_r_prob(uint_t val) {cfg.ecn_r_prob = val;}
+
+    uint_t  get_ecn_c_min() const   {return cfg.ecn_c_min;}
+    void    set_ecn_c_min(uint_t val) {cfg.ecn_c_min = val;}
+
+    uint_t  get_ecn_c_max() const   {return cfg.ecn_c_max;}
+    void    set_ecn_c_max(uint_t val) {cfg.ecn_c_max = val;}
+
+    uint_t  get_ecn_c_prob()  const  {return cfg.ecn_c_prob;}
+    void    set_ecn_c_prob(uint_t val) {cfg.ecn_c_prob = val;}
+
     uint_t  get_weight() const {return cfg.weight;}
     void    set_weight(uint_t val) {cfg.weight = val;}
 
@@ -135,6 +208,8 @@ public:
     void set_ndi_obj_id (npu_id_t npu_id,
                          ndi_obj_id_t obj_id);
     void reset_ndi_obj_id (npu_id_t npu_id);
+
+    t_std_error get_cfg_value_by_attr_id(nas_attr_id_t attr_id, uint64_t &value) const;
 
 } ;
 

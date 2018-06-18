@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+./nas_qos_policer_unittest
+./nas_qos_wred_unittest
+./nas_qos_scheduler_unittest
+
+
+
+

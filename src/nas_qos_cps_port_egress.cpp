@@ -121,7 +121,7 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -423,7 +423,7 @@ void nas_qos_port_egress_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_
             // Get should return only one object matching to the interface
             if (len > 1) {
                 EV_LOGGING(QOS,WARNING,"QOS-DB-GET",
-                        "More than one entry (%d) with the same index %d in DB",
+                        "More than one entry (%lu) with the same index %d in DB",
                         len, ifindex);
             }
             cps_api_object_t db_obj = cps_api_object_list_get(lst.get(),0);

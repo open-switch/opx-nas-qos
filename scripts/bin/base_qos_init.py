@@ -194,6 +194,16 @@ def init_port(ifidx, ifname, iftype, speed, xnode_port, lookup_map, lookup_sched
                 ifname,
                 iftype,
                 speed)
+        # Port's buffer profile setting
+        elif xnode_obj.tag == 'port-ingress':
+            syslog.syslog(" > Set port's ingress buffer profile")
+            init_ingress_buffer_on_port(
+                xnode_obj,
+                lookup_buf_prof,
+                ifidx,
+                ifname,
+                iftype,
+                speed)
 
 
 
@@ -293,6 +303,7 @@ def init_sched_tree_on_port(xnode_sched_tree, lookup_sched_prof, lookup_buf_prof
         print "======After configuration, New setting:"
         read_sched_grp(ifidx, ifname)
 
+
 def init_pg_on_port(xnode_obj, lookup_buf_prof, ifidx, ifname, iftype, speed):
 
     local_id = xnode_obj.attrib['local-id']
@@ -326,6 +337,38 @@ def init_pg_on_port(xnode_obj, lookup_buf_prof, ifidx, ifname, iftype, speed):
     local_id = m.extract_attr('local-id')
     if (dbg_on):
         print "Successfully modified PG of Port %d local-id %d" % (port_id, local_id)
+
+def init_ingress_buffer_on_port(xnode_obj, lookup_buf_prof, ifidx, ifname, iftype, speed):
+
+    speed_str = get_speed_str_by_iftype_speed(iftype, speed)
+    buffer_profile_name = xnode_obj.attrib['buffer-profile'] + '-ing-' + speed_str
+
+    buffer_profile_id = None
+    if (buffer_profile_name in lookup_buf_prof):
+        buffer_profile_id = lookup_buf_prof[buffer_profile_name]
+
+    if (dbg_on):
+        print "speed: {0}, buffer_profile_id: {1}".format(speed, buffer_profile_id)
+
+    if (buffer_profile_id is None):
+        # no matching buffer profile is defined, no configuration
+        return
+
+    m = nas_qos.IngPortCPSObj(ifname=ifname)
+    m.set_attr('buffer-profile-id-list', [buffer_profile_id])
+
+    upd = ('set', m.data())
+    ret_cps_data = cps_utils.CPSTransaction([upd]).commit()
+
+    if ret_cps_data == False:
+        syslog.syslog("Set Ingress buffer failed for port {0}".format(ifname))
+        return None
+
+    if (dbg_on):
+        print 'Return = ', ret_cps_data
+    if (dbg_on):
+        print "Successfully modified ingress buffer of Port %s" % (ifname)
+
 
 def get_sched_grp(level, sg_number, sg_info):
     return sg_info[level][sg_number]
@@ -552,7 +595,7 @@ def read_current_buf_prof(lookup_buf_prof):
             if (bp_name):
                 lookup_buf_prof[bp_name] = bp_id;
     else:
-        syslog.syslog('Error in get buffer profiles')
+        syslog.syslog('Get buffer profiles returns None')
 
 
 def read_current_sched_prof(lookup_sched_prof):
@@ -570,7 +613,7 @@ def read_current_sched_prof(lookup_sched_prof):
              if (sp_name):
                  lookup_sched_prof[sp_name] = sp_id;
      else:
-         syslog.syslog('Error in get scheduler profiles')
+         syslog.syslog('Get scheduler profiles returns None')
 
 
 def read_current_map(lookup_map, yang_map_name):
@@ -588,15 +631,10 @@ def read_current_map(lookup_map, yang_map_name):
             if (name):
                 lookup_map[name] = id;
     else:
-        syslog.syslog('Error in get maps')
+        syslog.syslog('Get maps returns None')
 
 
 def init_interfaces(ifnames):
-    if 'DN_QOS_CFG_PATH' in os.environ.keys():
-        qos_cfg_path = os.environ['DN_QOS_CFG_PATH']
-    else:
-        qos_cfg_path = target_cfg_path
-
     xnode_root = ET.parse(get_cfg()).getroot()
 
     lookup_sched_prof = {}
@@ -605,9 +643,18 @@ def init_interfaces(ifnames):
 
     # build the profile list
     read_current_buf_prof(lookup_buf_prof)
+    if lookup_sched_prof == {}:
+        return
+
     read_current_sched_prof(lookup_sched_prof)
+    if lookup_sched_prof == {}:
+        return
+
     for map_type in map_types:
         read_current_map(lookup_map, map_type)
+
+    if lookup_map == {}:
+        return
 
     if (dbg_on):
         print lookup_buf_prof

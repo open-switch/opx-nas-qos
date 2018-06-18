@@ -84,7 +84,7 @@ bool nas_qos_port_pool::push_create_obj_to_npu (npu_id_t npu_id,
         ndi_port_pool.wred_profile_id =
                 p_switch.nas2ndi_wred_profile_id(nas_qos_port_pool_p->cfg.wred_id, npu_id);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Creating port pool object on NPU %d, port_id %u, ndi_pool_id %u",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Creating port pool object on NPU %d, port_id %u, ndi_pool_id %lu",
             ndi_port_pool.ndi_port.npu_id, ndi_port_pool.ndi_port.npu_port, ndi_port_pool.ndi_pool_id);
 
 
@@ -143,7 +143,7 @@ bool nas_qos_port_pool::push_leaf_attr_to_npu(nas_attr_id_t attr_id,
 {
     t_std_error rc = STD_ERR_OK;
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %lu",
                     npu_id, attr_id);
 
     ndi_qos_port_pool_struct_t ndi_cfg;

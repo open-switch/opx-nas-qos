@@ -107,7 +107,7 @@ class nas_qos_switch : public nas::base_switch_t
     /************  Schedulers ********************************/
     scheduler_list_t     schedulers;
 
-    static const size_t NAS_QOS_SCHEDULER_ID_MAX = 2000;
+    static const size_t NAS_QOS_SCHEDULER_ID_MAX = 4000;
 
     nas::id_generator_t  _scheduler_id_gen {NAS_QOS_SCHEDULER_ID_MAX};
 

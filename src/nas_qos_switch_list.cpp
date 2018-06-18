@@ -314,20 +314,38 @@ void nas_qos_if_set_notify(uint_t ifindex, ndi_port_t ndi_port_id, bool isAdd)
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     // The order is important here!
-    // Port Priority Group DB
-    nas_qos_port_priority_group_association(ifindex, ndi_port_id, isAdd);
+    if (isAdd) {
+        // Port Ingress DB
+        nas_qos_port_ingress_association(ifindex, ndi_port_id, isAdd);
 
-    // Queue DB
-    nas_qos_port_queue_association(ifindex, ndi_port_id, isAdd);
+        // Port Egress DB
+        nas_qos_port_egress_association(ifindex, ndi_port_id, isAdd);
 
-    // Scheduler Group DB
-    nas_qos_port_scheduler_group_association(ifindex, ndi_port_id, isAdd);
+        // Queue DB
+        nas_qos_port_queue_association(ifindex, ndi_port_id, isAdd);
 
-    // Port Ingress DB
-    nas_qos_port_ingress_association(ifindex, ndi_port_id, isAdd);
+        // Scheduler Group DB
+        nas_qos_port_scheduler_group_association(ifindex, ndi_port_id, isAdd);
 
-    // Port Egress DB
-    nas_qos_port_egress_association(ifindex, ndi_port_id, isAdd);
+        // Port Priority Group DB
+        nas_qos_port_priority_group_association(ifindex, ndi_port_id, isAdd);
+    }
+    else {
+        // Port Priority Group DB
+        nas_qos_port_priority_group_association(ifindex, ndi_port_id, isAdd);
+
+        // Queue DB
+        nas_qos_port_queue_association(ifindex, ndi_port_id, isAdd);
+
+        // Scheduler Group DB
+        nas_qos_port_scheduler_group_association(ifindex, ndi_port_id, isAdd);
+
+        // Port Ingress DB
+        nas_qos_port_ingress_association(ifindex, ndi_port_id, isAdd);
+
+        // Port Egress DB
+        nas_qos_port_egress_association(ifindex, ndi_port_id, isAdd);
+    }
 
     // Port Pool
     nas_qos_port_pool_association(ifindex, ndi_port_id, isAdd);

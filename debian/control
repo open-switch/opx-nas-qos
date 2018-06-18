@@ -17,7 +17,7 @@ Description: This package contains base QoS functionality for the Openswitch sof
 
 Package: libopx-nas-qos-dev
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common-dev (>= 1.4.0),libopx-cps-dev (>= 3.6.2),
+Depends: ${misc:Depends},libopx-common-dev (>= 1.4.0),libopx-cps-dev (>= 3.6.2),
           libopx-logging-dev (>= 2.1.0),libopx-nas-common-dev (>= 6.1.0),opx-ndi-api-dev (>= 6.12.0),
           libopx-nas-ndi-dev (>= 3.26.0),libopx-nas-qos1 (=${binary:Version}),
           libopx-base-model-dev (>= 3.109.0)
@@ -25,6 +25,6 @@ Description: This package contains base QoS functionality for the Openswitch sof
 
 Package: opx-nas-qos
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, opx-cps (>= 3.6.2), python-opx-cps (>= 3.6.2), 
+Depends: ${misc:Depends}, opx-cps (>= 3.6.2), python-opx-cps (>= 3.6.2), 
           opx-nas-linux (>= 5.11.0)
 Description: This package contains base QoS functionality for the Openswitch software.

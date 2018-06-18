@@ -92,7 +92,7 @@ bool nas_qos_priority_group::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
     nas_qos_switch & nas_switch = const_cast<nas_qos_switch &>(get_switch());
     ndi_obj_id_t ndi_obj;
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %lu",
                     npu_id, attr_id);
 
     switch (attr_id) {
@@ -102,7 +102,7 @@ bool nas_qos_priority_group::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
         } else {
             p_buffer_profile = nas_switch.get_buffer_profile(buffer_profile);
             if (p_buffer_profile == NULL) {
-                EV_LOGGING(QOS, DEBUG, "QOS", "buffer_profile id %u not found",
+                EV_LOGGING(QOS, DEBUG, "QOS", "buffer_profile id %lu not found",
                                 buffer_profile);
                 rc = STD_ERR(QOS, CFG, 0);
                 break;

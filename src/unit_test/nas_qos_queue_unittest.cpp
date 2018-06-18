@@ -185,7 +185,7 @@ bool nas_qos_wred_create_test() {
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD, 60);
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY, 30);
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_WEIGHT, 8);
-    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE, 1);
+    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_MARK, 7);
 
     if (cps_api_create(&tran, obj) != cps_api_ret_code_OK) {
         cout << "CPS API CREATE FAILED" <<endl;

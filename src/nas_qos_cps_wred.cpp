@@ -110,7 +110,7 @@ cps_api_return_code_t nas_qos_cps_api_wred_read (void * context,
     uint_t switch_id = 0;
     nas_obj_id_t wred_id = (wred_id_attr? cps_api_object_attr_data_u64(wred_id_attr): 0);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, wred id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, wred id %lu\n",
                     switch_id, wred_id);
 
     std_mutex_simple_lock_guard p_m(&wred_mutex);
@@ -178,6 +178,20 @@ static cps_api_return_code_t _append_one_wred(cps_api_get_params_t * param,
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD, wred->get_r_min());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD, wred->get_r_max());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY, wred->get_r_drop_prob());
+
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_GREEN_MIN_THRESHOLD, wred->get_ecn_g_min());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_GREEN_MAX_THRESHOLD, wred->get_ecn_g_max());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_GREEN_PROBABILITY,   wred->get_ecn_g_prob());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_YELLOW_MIN_THRESHOLD, wred->get_ecn_y_min());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_YELLOW_MAX_THRESHOLD, wred->get_ecn_y_max());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_YELLOW_PROBABILITY,   wred->get_ecn_y_prob());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_RED_MIN_THRESHOLD, wred->get_ecn_r_min());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_RED_MAX_THRESHOLD, wred->get_ecn_r_max());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_RED_PROBABILITY,   wred->get_ecn_r_prob());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MIN_THRESHOLD, wred->get_ecn_c_min());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MAX_THRESHOLD, wred->get_ecn_c_max());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_PROBABILITY,   wred->get_ecn_c_prob());
+
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_WEIGHT, wred->get_weight());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE, wred->get_ecn_enable());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_WRED_PROFILE_ECN_MARK, wred->get_ecn_mark());
@@ -257,7 +271,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_create(
 
         p_switch->add_wred(wred);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new wred %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new wred %lu\n",
                      wred.get_wred_id());
 
         // update obj with new wred-id attr and key
@@ -307,7 +321,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_set(
             !=    cps_api_ret_code_OK)
         return rc;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, wred id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, wred id %lu\n",
                     switch_id, wred_id);
 
     nas_qos_wred * wred_p = nas_qos_cps_get_wred(switch_id, wred_id);
@@ -322,7 +336,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_set(
         return rc;
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying wred %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying wred %lu attr \n",
                      wred.get_wred_id());
 
         nas::attr_set_t modified_attr_list = wred.commit_modify(*wred_p, (sav_obj? false: true));
@@ -384,13 +398,13 @@ static cps_api_return_code_t nas_qos_cps_api_wred_delete(
 
     nas_qos_wred *wred_p = p_switch->get_wred(wred_id);
     if (wred_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " wred id: %u not found\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " wred id: %lu not found\n",
                      wred_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting wred %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting wred %lu on switch: %u\n",
                  wred_p->get_wred_id(), p_switch->id());
 
 
@@ -398,7 +412,7 @@ static cps_api_return_code_t nas_qos_cps_api_wred_delete(
     try {
         wred_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted wred %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted wred %lu\n",
                      wred_p->get_wred_id());
 
          // save current wred config for rollback if caller requests it.
@@ -452,118 +466,140 @@ static cps_api_return_code_t nas_qos_cps_get_switch_and_wred_id(
 static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
                                               nas_qos_wred &wred)
 {
-    npu_id_t npu_id;
     uint_t val;
     cps_api_object_it_t it;
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
         cps_api_attr_id_t id = cps_api_object_attr_id(it.attr);
-        switch (id) {
-        case BASE_QOS_WRED_PROFILE_SWITCH_ID:
-        case BASE_QOS_WRED_PROFILE_ID:
-            break; // These are for part of the keys
+        // skip keys and unprocessed fields
+        if (id == BASE_QOS_WRED_PROFILE_SWITCH_ID ||  //keys
+            id == BASE_QOS_WRED_PROFILE_ID ||  //keys
+            id == CPS_API_ATTR_RESERVE_RANGE_END)
+            continue;
 
-        case BASE_QOS_WRED_PROFILE_GREEN_ENABLE:
-            val = cps_api_object_attr_data_u32(it.attr);
+        // All processed fields
+        if (id == BASE_QOS_WRED_PROFILE_ECN_ENABLE)
+            // To be deprecated; use new attribute
+            wred.mark_attr_dirty(BASE_QOS_WRED_PROFILE_ECN_MARK);
+        else
             wred.mark_attr_dirty(id);
+        val = cps_api_object_attr_data_u32(it.attr);
+
+        switch (id) {
+        case BASE_QOS_WRED_PROFILE_GREEN_ENABLE:
             wred.set_g_enable((bool)val);
             break;
 
         case BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_g_min(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_g_max(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_g_drop_prob(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_YELLOW_ENABLE:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_y_enable((bool)val);
             break;
 
         case BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_y_min(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_y_max(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_y_drop_prob(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_RED_ENABLE:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_r_enable((bool)val);
             break;
 
         case BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_r_min(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_r_max(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_r_drop_prob(val);
             break;
 
+        case BASE_QOS_WRED_PROFILE_ECN_GREEN_MIN_THRESHOLD:
+            wred.set_ecn_g_min(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_GREEN_MAX_THRESHOLD:
+            wred.set_ecn_g_max(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_GREEN_PROBABILITY:
+            wred.set_ecn_g_prob(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_YELLOW_MIN_THRESHOLD:
+            wred.set_ecn_y_min(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_YELLOW_MAX_THRESHOLD:
+            wred.set_ecn_y_max(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_YELLOW_PROBABILITY:
+            wred.set_ecn_y_prob(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_RED_MIN_THRESHOLD:
+            wred.set_ecn_r_min(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_RED_MAX_THRESHOLD:
+            wred.set_ecn_r_max(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_RED_PROBABILITY:
+            wred.set_ecn_r_prob(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MIN_THRESHOLD:
+            wred.set_ecn_c_min(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MAX_THRESHOLD:
+            wred.set_ecn_c_max(val);
+            break;
+
+        case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_PROBABILITY:
+            wred.set_ecn_c_prob(val);
+            break;
+
         case BASE_QOS_WRED_PROFILE_WEIGHT:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_weight(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_ecn_enable(val);
             break;
 
         case BASE_QOS_WRED_PROFILE_ECN_MARK:
-            val = cps_api_object_attr_data_u32(it.attr);
-            wred.mark_attr_dirty(id);
             wred.set_ecn_mark((BASE_QOS_ECN_MARK_MODE_t)val);
             break;
-        case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:
-            npu_id = cps_api_object_attr_data_u32(it.attr);
-            wred.add_npu(npu_id);
-            wred.mark_attr_dirty(id);
-            break;
 
-        case CPS_API_ATTR_RESERVE_RANGE_END:
-            // skip keys
+        case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:
+            wred.add_npu((npu_id_t)val);
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -580,6 +616,8 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
     // filling in the keys
     uint32_t switch_id = wred.switch_id();
     nas_obj_id_t wred_id = wred.get_wred_id();
+    uint64_t val;
+
     cps_api_key_from_attr_with_qual(cps_api_object_key(obj),BASE_QOS_WRED_PROFILE_OBJ,
             cps_api_qualifier_TARGET);
 
@@ -592,95 +630,22 @@ static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
 
 
     for (auto attr_id: attr_set) {
-        switch (attr_id) {
-        case BASE_QOS_WRED_PROFILE_ID:
+        if (attr_id == BASE_QOS_WRED_PROFILE_ID)
             /* key */
-            break;
+            continue;
 
-        case BASE_QOS_WRED_PROFILE_GREEN_ENABLE:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_GREEN_ENABLE,
-                    wred.get_g_enable());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD,
-                    wred.get_g_min());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD,
-                    wred.get_g_max());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY,
-                    wred.get_g_drop_prob());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_YELLOW_ENABLE:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_ENABLE,
-                    wred.get_y_enable());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD,
-                    wred.get_y_min());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD,
-                    wred.get_y_max());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY,
-                    wred.get_y_drop_prob());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_RED_ENABLE:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_RED_ENABLE,
-                    wred.get_r_enable());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD,
-                    wred.get_r_min());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD,
-                    wred.get_r_max());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY,
-                    wred.get_r_drop_prob());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_WEIGHT:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_WEIGHT,
-                    wred.get_weight());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE,
-                    wred.get_ecn_enable());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_ECN_MARK:
-            cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_MARK,
-                    wred.get_ecn_mark());
-            break;
-
-        case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:
+        if (attr_id == BASE_QOS_WRED_PROFILE_NPU_ID_LIST) {
             for (auto npu_id: wred.npu_list()) {
-                cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_NPU_ID_LIST, npu_id);
+                cps_api_object_attr_add_u32(obj, attr_id, npu_id);
             }
-            break;
-
-        default:
-            break;
+            continue;
         }
+
+        // all other attributes
+        if (wred.get_cfg_value_by_attr_id(attr_id, val) != STD_ERR_OK)
+            continue;
+
+        cps_api_object_attr_add_u32(obj, attr_id, (uint32_t)val);
     }
 
     return cps_api_ret_code_OK;
