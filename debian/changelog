@@ -1,3 +1,12 @@
+opx-nas-qos (2.4.0) unstable; urgency=medium
+
+  * Feature: Routing VRF
+  * Feature: Global ECN support for 4200
+  * Feature: Add color-blind ECN support
+  * Bugfix: Delay qos init script until fanout script finishes
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Tue, 29 May 2018 15:45:18 -0800
+
 opx-nas-qos (2.2.0+opx3) unstable; urgency=medium
 
   * Bugfix: Changes to support Dell S5148F-ON
@@ -21,7 +30,7 @@ opx-nas-qos (2.2.0+opx1) unstable; urgency=medium
 
   * Bugfix: opx-qos-init.service failed when dn_nas_fanout_init_config.xml has fanout config
 
- -- Dell EMC <ops-dev@lists.openswitch.net>  Thur, 02 Feb 2018 15:45:18 -0800
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Thu, 02 Feb 2018 15:45:18 -0800
 
 opx-nas-qos (2.2.0) unstable; urgency=medium
 

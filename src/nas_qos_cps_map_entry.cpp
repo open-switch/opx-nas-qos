@@ -209,7 +209,7 @@ cps_api_return_code_t nas_qos_cps_api_map_read_type (void * context,
         }
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, map id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, map id %lu\n",
                     switch_id, map_id);
 
     nas_qos_switch * p_switch = nas_qos_get_switch(switch_id);
@@ -223,7 +223,7 @@ cps_api_return_code_t nas_qos_cps_api_map_read_type (void * context,
             return NAS_QOS_E_FAIL;
 
         if (map->get_type() != map_type) {
-            EV_LOGGING(QOS, ERR, "NAS-QOS", "Map id %u has type %u, not type %u",
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Map id %lu has type %u, not type %u",
                     map_id, map->get_type(), map_type);
             return NAS_QOS_E_FAIL;
         }
@@ -390,7 +390,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
 
             p_switch->add_map(map);
 
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new map %u\n",
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new map %lu\n",
                          map.get_map_id());
 
             // update obj with new map-id attr and key
@@ -499,7 +499,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_set(
     if (p_switch == NULL)
         return NAS_QOS_E_FAIL;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, map id %u, key %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, map id %lu, key %u\n",
                     switch_id, map_id, key.any);
 
     nas_qos_map * map_p = nas_qos_cps_get_map(switch_id, map_id);
@@ -549,7 +549,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_set(
         return rc;
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying map %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying map %lu attr \n",
                      entry.get_map_id());
 
         if (entry.is_created_in_ndi() == false)
@@ -620,13 +620,13 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
 
     nas_qos_map * map_p = nas_qos_cps_get_map(switch_id, map_id);
     if (map_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " map id: %u not found\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " map id: %lu not found\n",
                      map_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting map %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting map %lu on switch: %u\n",
                  map_id, switch_id);
 
     if (!is_map_entry) {
@@ -635,7 +635,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
 
         if (entries && entries->size() != 0) {
             EV_LOGGING(QOS, NOTICE, "NAS-QOS",
-                    "Map entry exists (%d), cannot delete the map\n",
+                    "Map entry exists (%lu), cannot delete the map\n",
                     entries->size());
 
             return NAS_QOS_E_INCONSISTENT;
@@ -649,7 +649,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
 
             map_p->commit_delete(sav_obj? false: true);
 
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted map %u\n",
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted map %lu\n",
                          map_p->get_map_id());
 
             // save current map config for rollback if caller requests it.
@@ -674,7 +674,7 @@ static cps_api_return_code_t nas_qos_cps_api_map_delete(
 
             entry.commit_delete(sav_obj? false: true);
 
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted map %u entry, key %u\n",
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted map %lu entry, key %u\n",
                          map_p->get_map_id(), key.any);
 
             // save current map config for rollback if caller requests it.

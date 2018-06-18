@@ -68,7 +68,7 @@ bool nas_qos_wred_create_test(uint64_t &wred_id) {
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD, 60);
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY, 30);
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_WEIGHT, 8);
-    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE, 1);
+    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_MARK, 7);
 
     if (cps_api_create(&tran, obj) != cps_api_ret_code_OK) {
         cout << "CPS API CREATE FAILED" <<endl;
@@ -143,7 +143,7 @@ bool nas_qos_wred_get_test(uint64_t wred_id) {
             cps_api_object_attr_t r_max = cps_api_object_attr_get(obj, BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD);
             cps_api_object_attr_t r_drop_prob = cps_api_object_attr_get(obj, BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY);
             cps_api_object_attr_t weight = cps_api_object_attr_get(obj, BASE_QOS_WRED_PROFILE_WEIGHT);
-            cps_api_object_attr_t ecn_enable = cps_api_object_attr_get(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE);
+            cps_api_object_attr_t ecn_mark= cps_api_object_attr_get(obj, BASE_QOS_WRED_PROFILE_ECN_MARK);
 
 
             if (g_enable)
@@ -185,8 +185,8 @@ bool nas_qos_wred_get_test(uint64_t wred_id) {
             if (weight)
                 cout << "weight: "<< cps_api_object_attr_data_u32(weight) << endl;
 
-            if (ecn_enable)
-                cout << "ecn_enable: "<< cps_api_object_attr_data_u32(ecn_enable) << endl;
+            if (ecn_mark)
+                cout << "ecn_mark: "<< cps_api_object_attr_data_u32(ecn_mark) << endl;
         }
 
         rc = true;
@@ -316,7 +316,7 @@ bool nas_qos_wred_set_npu_and_attr_test() {
     // change to set on only npu 2 and 3
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_NPU_ID_LIST, 2);
     cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_NPU_ID_LIST, 3);
-    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_ENABLE, 0);
+    cps_api_object_attr_add_u32(obj, BASE_QOS_WRED_PROFILE_ECN_MARK, 0);
 
 
     if (cps_api_set(&trans,obj)!=cps_api_ret_code_OK) return false;

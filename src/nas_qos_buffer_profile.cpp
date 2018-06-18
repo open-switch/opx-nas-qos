@@ -150,7 +150,7 @@ bool nas_qos_buffer_profile::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
     t_std_error rc = STD_ERR_OK;
     nas_qos_switch & p_switch = const_cast <nas_qos_switch &> (get_switch());
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %lu",
                     npu_id, attr_id);
 
     ndi_qos_buffer_profile_struct_t cfg= {0};

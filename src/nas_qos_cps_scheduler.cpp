@@ -106,7 +106,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_read (void * context,
     uint_t switch_id = 0;
     nas_obj_id_t scheduler_id = (scheduler_attr? cps_api_object_attr_data_u64(scheduler_attr): 0);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, scheduler id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, scheduler id %lu\n",
                     switch_id, scheduler_id);
 
     std_mutex_simple_lock_guard p_m(&scheduler_mutex);
@@ -252,7 +252,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_create(
 
         p_switch->add_scheduler(scheduler);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new scheduler %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new scheduler %lu\n",
                      scheduler.get_scheduler_id());
 
         // update obj with new scheduler-id key
@@ -305,7 +305,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_set(
     uint_t switch_id = 0;
     nas_obj_id_t scheduler_id = cps_api_object_attr_data_u64(scheduler_attr);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler id %lu\n",
                     switch_id, scheduler_id);
 
     nas_qos_scheduler * scheduler_p = nas_qos_cps_get_scheduler(switch_id, scheduler_id);
@@ -320,7 +320,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_set(
         return NAS_QOS_E_FAIL;
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler %lu attr \n",
                      scheduler.get_scheduler_id());
 
         nas::attr_set_t modified_attr_list = scheduler.commit_modify(*scheduler_p, (sav_obj? false: true));
@@ -380,13 +380,13 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_delete(
 
     nas_qos_scheduler *scheduler_p = p_switch->get_scheduler(scheduler_id);
     if (scheduler_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler id: %u not found\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler id: %lu not found\n",
                      scheduler_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting scheduler %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting scheduler %lu on switch: %u\n",
                  scheduler_p->get_scheduler_id(), p_switch->id());
 
 
@@ -394,7 +394,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_delete(
     try {
         scheduler_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted scheduler %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted scheduler %lu\n",
                      scheduler_p->get_scheduler_id());
 
          // save current scheduler config for rollback if caller requests it.
@@ -495,7 +495,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
        default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }

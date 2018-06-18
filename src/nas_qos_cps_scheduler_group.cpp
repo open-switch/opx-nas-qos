@@ -529,7 +529,7 @@ t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex, ndi_port_t ndi_port_id
     // init physical and VP port queues
     if (nas_qos_port_queue_init(ifindex, ndi_port_id, parent_map) != STD_ERR_OK) {
         EV_LOGGING(QOS, NOTICE, "QOS",
-                     "Failed to initialize queue for port %lu", ifindex);
+                     "Failed to initialize queue for port %d", ifindex);
         return NAS_QOS_E_FAIL;
     }
 
@@ -670,7 +670,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
         nas_qos_scheduler_group *scheduler_group = p_switch->get_scheduler_group(scheduler_group_id);
         if (scheduler_group == NULL) {
             EV_LOGGING(QOS, INFO, "NAS-QOS",
-                         "Could not find scheduler group with ID %llu", scheduler_group_id);
+                         "Could not find scheduler group with ID %lu", scheduler_group_id);
             return NAS_QOS_E_FAIL;
         }
         sg_list.push_back(scheduler_group);
@@ -782,7 +782,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
 
         p_switch->add_scheduler_group(scheduler_group);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new scheduler_group %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new scheduler_group %lu\n",
                      scheduler_group.get_scheduler_group_id());
 
         if (scheduler_group.dirty_attr_list().contains(BASE_QOS_SCHEDULER_GROUP_PARENT)) {
@@ -841,7 +841,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
     uint_t switch_id = 0;
     nas_obj_id_t scheduler_group_id = cps_api_object_attr_data_u64(sg_attr);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler_group id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler_group id %lu\n",
                     switch_id, scheduler_group_id);
 
     nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(switch_id);
@@ -862,7 +862,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
     /* make a local copy of the existing scheduler_group */
     nas_qos_scheduler_group scheduler_group(*scheduler_group_p);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler_group id %u . After copy\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, scheduler_group id %lu . After copy\n",
                     switch_id, scheduler_group_id);
 
     cps_api_return_code_t rc = cps_api_ret_code_OK;
@@ -884,7 +884,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
     }
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler_group %u attr on port %u \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler_group %lu attr on port %d \n",
                      scheduler_group.get_scheduler_group_id(), scheduler_group.get_port_id());
 
         if (!nas_is_virtual_port(scheduler_group.get_port_id())) {
@@ -962,20 +962,20 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
     nas_qos_scheduler_group *scheduler_group_p = p_switch->get_scheduler_group(scheduler_group_id);
     if (scheduler_group_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %u not found\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %lu not found\n",
                      scheduler_group_id);
 
         return NAS_QOS_E_FAIL;
     }
 
     if (scheduler_group_p->get_child_count() > 0) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %u cannot be deleted because it is being referenced.\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %lu cannot be deleted because it is being referenced.\n",
                      scheduler_group_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting scheduler_group %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting scheduler_group %lu on switch: %u\n",
                  scheduler_group_p->get_scheduler_group_id(), p_switch->id());
 
 
@@ -983,7 +983,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
     try {
         scheduler_group_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted scheduler_group %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted scheduler_group %lu\n",
                      scheduler_group_p->get_scheduler_group_id());
 
         nas_obj_id_t old_parent_id = scheduler_group_p->get_parent();
@@ -1069,7 +1069,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
        default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }

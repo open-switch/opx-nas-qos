@@ -75,7 +75,7 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -203,7 +203,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_read(void * context,
     nas_obj_id_t pool_id = (pool_id_attr? cps_api_object_attr_data_u64(pool_id_attr): 0);
 
     uint_t switch_id = 0;
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, port_id %u, buffer_pool id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, port_id %u, buffer_pool id %lu\n",
                     switch_id, port_id, pool_id);
 
     std_mutex_simple_lock_guard p_m(&port_pool_mutex);
@@ -394,7 +394,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_set(
             !=    cps_api_ret_code_OK)
         return rc;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, port_id %u, pool id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, port_id %u, pool id %lu\n",
                     switch_id, port_id, pool_id);
 
     nas_qos_port_pool * port_pool_p = nas_qos_cps_get_port_pool(switch_id, port_id, pool_id);
@@ -478,7 +478,7 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_delete(
 
     nas_qos_port_pool *port_pool_p = p_switch->get_port_pool(port_id, pool_id);
     if (port_pool_p == NULL) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " port_pool not found with port_id %u, pool_id %u\n",
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " port_pool not found with port_id %u, pool_id %lu\n",
                      port_id, pool_id);
 
         return NAS_QOS_E_FAIL;
@@ -632,7 +632,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
         return NAS_QOS_E_FAIL;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, port_id %u pool_id %u stat\n",
+            "Read switch id %u, port_id %u pool_id %lu stat\n",
             switch_id, key.port_id, key.pool_id);
 
     std_mutex_simple_lock_guard p_m(&port_pool_mutex);
@@ -661,7 +661,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_read (void * context,
 
         stat_attr_capability stat_attr;
         if (_port_pool_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %lu, ignored", id);
             continue;
         }
 
@@ -747,7 +747,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
         return NAS_QOS_E_FAIL;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, port_id %u pool_id %u stat\n",
+            "Read switch id %u, port_id %u pool_id %lu stat\n",
             switch_id, key.port_id, key.pool_id);
 
     std_mutex_simple_lock_guard p_m(&port_pool_mutex);
@@ -776,7 +776,7 @@ cps_api_return_code_t nas_qos_cps_api_port_pool_stat_clear (void * context,
 
         stat_attr_capability stat_attr;
         if (_port_pool_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown port_pool STAT flag: %lu, ignored", id);
             continue;
         }
 

@@ -41,6 +41,19 @@ class WredCPSObj:
         'ecn-enable': ('leaf', 'uint32_t'),
         'ecn-mark': ('leaf', 'enum', 'base-qos:ecn-mark-mode:'),
         'npu-id-list': ('leaf', 'uint32_t'),
+        'ecn-green/min-threshold': ('leaf', 'uint32_t'),
+        'ecn-green/max-threshold': ('leaf', 'uint32_t'),
+        'ecn-green/probability': ('leaf', 'uint32_t'),
+        'ecn-yellow/min-threshold': ('leaf', 'uint32_t'),
+        'ecn-yellow/max-threshold': ('leaf', 'uint32_t'),
+        'ecn-yellow/probability': ('leaf', 'uint32_t'),
+        'ecn-red/min-threshold': ('leaf', 'uint32_t'),
+        'ecn-red/max-threshold': ('leaf', 'uint32_t'),
+        'ecn-red/probability': ('leaf', 'uint32_t'),
+        'ecn-color-unaware/min-threshold': ('leaf', 'uint32_t'),
+        'ecn-color-unaware/max-threshold': ('leaf', 'uint32_t'),
+        'ecn-color-unaware/probability': ('leaf', 'uint32_t'),
+
     }
 
     @classmethod

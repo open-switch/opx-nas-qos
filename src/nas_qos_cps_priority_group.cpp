@@ -356,7 +356,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -821,7 +821,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
             break;
 
         default:
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown priority_group STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown priority_group STAT flag: %lu, ignored", id);
             break;
         }
     }
@@ -953,7 +953,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
 
         default:
             EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-                    "Unknown priority_group STAT flag: %u, ignored", id);
+                    "Unknown priority_group STAT flag: %lu, ignored", id);
             break;
         }
     }

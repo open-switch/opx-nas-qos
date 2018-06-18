@@ -112,7 +112,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_read (void * context,
     nas_obj_id_t buffer_pool_id = (buffer_pool_id_attr?
                                     cps_api_object_attr_data_u64(buffer_pool_id_attr): 0);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, buffer_pool id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, buffer_pool id %lu\n",
                     switch_id, buffer_pool_id);
 
     std_mutex_simple_lock_guard p_m(&buffer_pool_mutex);
@@ -256,7 +256,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
 
         p_switch->add_buffer_pool(buffer_pool);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new buffer_pool %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new buffer_pool %lu\n",
                      buffer_pool.get_buffer_pool_id());
 
         // update obj with new buffer_pool-id attr and key
@@ -307,7 +307,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_set(
             !=    cps_api_ret_code_OK)
         return rc;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, buffer_pool id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, buffer_pool id %lu\n",
                     switch_id, buffer_pool_id);
 
     nas_qos_buffer_pool * buffer_pool_p = nas_qos_cps_get_buffer_pool(switch_id, buffer_pool_id);
@@ -322,7 +322,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_set(
         return rc;
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying buffer_pool %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying buffer_pool %lu attr \n",
                      buffer_pool.get_buffer_pool_id());
 
         nas::attr_set_t modified_attr_list = buffer_pool.commit_modify(
@@ -386,13 +386,13 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
 
     nas_qos_buffer_pool *buffer_pool_p = p_switch->get_buffer_pool(buffer_pool_id);
     if (buffer_pool_p == NULL) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " buffer_pool id: %u not found\n",
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " buffer_pool id: %lu not found\n",
                      buffer_pool_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting buffer_pool %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting buffer_pool %lu on switch: %u\n",
                  buffer_pool_p->get_buffer_pool_id(), p_switch->id());
 
 
@@ -400,7 +400,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
     try {
         buffer_pool_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted buffer_pool %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted buffer_pool %lu\n",
                      buffer_pool_p->get_buffer_pool_id());
 
          // save current buffer_pool config for rollback if caller requests it.
@@ -501,7 +501,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %ld", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -667,7 +667,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
 
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, buffer_pool_id %u stat\n",
+            "Read switch id %u, buffer_pool_id %lu stat\n",
             switch_id, buffer_pool_id);
 
     std_mutex_simple_lock_guard p_m(&buffer_pool_mutex);
@@ -695,7 +695,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
 
         stat_attr_capability stat_attr;
         if (_buffer_pool_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown buffer_pool STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown buffer_pool STAT flag: %lu, ignored", id);
             continue;
         }
 
@@ -785,7 +785,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
     uint_t nas_mmu_index = (mmu_index_attr? cps_api_object_attr_data_u32(mmu_index_attr): 0);
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, pool_id %u stat\n",
+            "Read switch id %u, pool_id %lu stat\n",
             switch_id, buffer_pool_id);
 
     std_mutex_simple_lock_guard p_m(&buffer_pool_mutex);
@@ -813,7 +813,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
 
         stat_attr_capability stat_attr;
         if (_buffer_pool_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown buffer_pool STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown buffer_pool STAT flag: %lu, ignored", id);
             continue;
         }
 

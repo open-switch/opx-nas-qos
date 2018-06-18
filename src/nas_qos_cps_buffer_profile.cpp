@@ -111,7 +111,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_profile_read (void * context,
     nas_obj_id_t buffer_profile_id = (buffer_profile_id_attr?
                     cps_api_object_attr_data_u64(buffer_profile_id_attr): 0);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, buffer_profile id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, buffer_profile id %lu\n",
                     switch_id, buffer_profile_id);
 
     std_mutex_simple_lock_guard p_m(&buffer_profile_mutex);
@@ -257,7 +257,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_create(
 
         p_switch->add_buffer_profile(buffer_profile);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new buffer_profile %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new buffer_profile %lu\n",
                      buffer_profile.get_buffer_profile_id());
 
         // update obj with new buffer_profile-id attr and key
@@ -308,7 +308,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_set(
             !=    cps_api_ret_code_OK)
         return rc;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, buffer_profile id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, buffer_profile id %lu\n",
                     switch_id, buffer_profile_id);
 
     nas_qos_buffer_profile * buffer_profile_p = nas_qos_cps_get_buffer_profile(switch_id, buffer_profile_id);
@@ -323,7 +323,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_set(
         return rc;
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying buffer_profile %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying buffer_profile %lu attr \n",
                      buffer_profile.get_buffer_profile_id());
 
         nas::attr_set_t modified_attr_list = buffer_profile.commit_modify(
@@ -387,13 +387,13 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_delete(
 
     nas_qos_buffer_profile *buffer_profile_p = p_switch->get_buffer_profile(buffer_profile_id);
     if (buffer_profile_p == NULL) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " buffer_profile id: %u not found\n",
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", " buffer_profile id: %lu not found\n",
                      buffer_profile_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting buffer_profile %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting buffer_profile %lu on switch: %u\n",
                  buffer_profile_p->get_buffer_profile_id(), p_switch->id());
 
 
@@ -401,7 +401,7 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_profile_delete(
     try {
         buffer_profile_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted buffer_profile %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted buffer_profile %lu\n",
                      buffer_profile_p->get_buffer_profile_id());
 
          // save current buffer_profile config for rollback if caller requests it.
@@ -531,7 +531,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }

@@ -38,7 +38,7 @@ t_std_error nas_qos_switch::add_policer (nas_qos_policer& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_policer(p.policer_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "Policer_id exists: %d", p.policer_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "Policer_id exists: %lu", p.policer_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "Policer Exists"};
     }
 
@@ -49,11 +49,11 @@ t_std_error nas_qos_switch::add_policer (nas_qos_policer& p)
 
 void nas_qos_switch::remove_policer (nas_obj_id_t policer_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING Policer_id in switch: %d", policer_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING Policer_id in switch: %lu", policer_id);
     release_policer_id(policer_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING Policer_id from Policer List: %d", policer_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING Policer_id from Policer List: %lu", policer_id);
     policers.erase(policer_id);
 
     return;
@@ -72,7 +72,7 @@ t_std_error nas_qos_switch::add_wred (nas_qos_wred& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_wred(p.get_wred_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "wred_id exists: %d", p.get_wred_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "wred_id exists: %lu", p.get_wred_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "wred Exists"};
     }
 
@@ -83,11 +83,11 @@ t_std_error nas_qos_switch::add_wred (nas_qos_wred& p)
 
 void nas_qos_switch::remove_wred (nas_obj_id_t wred_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING wred_id in switch: %d", wred_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING wred_id in switch: %lu", wred_id);
     release_wred_id(wred_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING wred_id from wred List: %d", wred_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING wred_id from wred List: %lu", wred_id);
     wreds.erase(wred_id);
 
     return;
@@ -119,7 +119,7 @@ void nas_qos_switch::remove_queue(nas_qos_queue_key_t key)
         return;
     }
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING queue_id in switch: %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING queue_id in switch: %lu",
                 q->get_queue_id());
     release_queue_id(q->get_queue_id());
 
@@ -298,7 +298,7 @@ t_std_error nas_qos_switch::add_scheduler (nas_qos_scheduler& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_scheduler(p.get_scheduler_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "scheduler_id exists: %d", p.get_scheduler_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "scheduler_id exists: %lu", p.get_scheduler_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "scheduler Exists"};
     }
 
@@ -309,11 +309,11 @@ t_std_error nas_qos_switch::add_scheduler (nas_qos_scheduler& p)
 
 void nas_qos_switch::remove_scheduler (nas_obj_id_t scheduler_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_id in switch: %d", scheduler_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_id in switch: %lu", scheduler_id);
     release_scheduler_id(scheduler_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_id from scheduler List: %d", scheduler_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_id from scheduler List: %lu", scheduler_id);
     schedulers.erase(scheduler_id);
 
     return;
@@ -362,7 +362,7 @@ t_std_error nas_qos_switch::add_scheduler_group (nas_qos_scheduler_group& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_scheduler_group(p.get_scheduler_group_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "scheduler_group_id exists: %d", p.get_scheduler_group_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "scheduler_group_id exists: %lu", p.get_scheduler_group_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "scheduler_group Exists"};
     }
 
@@ -373,12 +373,12 @@ t_std_error nas_qos_switch::add_scheduler_group (nas_qos_scheduler_group& p)
 
 void nas_qos_switch::remove_scheduler_group (nas_obj_id_t scheduler_group_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id in switch: %d", scheduler_group_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id in switch: %lu", scheduler_group_id);
     if (!IS_SG_ID_AUTO_FORMED(scheduler_group_id))
         release_scheduler_group_id(scheduler_group_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id from scheduler_group List: %d", scheduler_group_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING scheduler_group_id from scheduler_group List: %lu", scheduler_group_id);
     scheduler_groups.erase(scheduler_group_id);
 
     return;
@@ -429,7 +429,7 @@ t_std_error nas_qos_switch::add_buffer_profile (nas_qos_buffer_profile& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_buffer_profile(p.get_buffer_profile_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_profile_id exists: %d", p.get_buffer_profile_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_profile_id exists: %lu", p.get_buffer_profile_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "buffer_profile Exists"};
     }
 
@@ -440,11 +440,11 @@ t_std_error nas_qos_switch::add_buffer_profile (nas_qos_buffer_profile& p)
 
 void nas_qos_switch::remove_buffer_profile (nas_obj_id_t buffer_profile_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_profile_id in switch: %d", buffer_profile_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_profile_id in switch: %lu", buffer_profile_id);
     release_buffer_profile_id(buffer_profile_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_profile_id from buffer_profile List: %d", buffer_profile_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_profile_id from buffer_profile List: %lu", buffer_profile_id);
     buffer_profiles.erase(buffer_profile_id);
 
     return;
@@ -463,7 +463,7 @@ t_std_error nas_qos_switch::add_buffer_pool (nas_qos_buffer_pool& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_buffer_pool(p.get_buffer_pool_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_pool_id exists: %d", p.get_buffer_pool_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_pool_id exists: %lu", p.get_buffer_pool_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "buffer_pool Exists"};
     }
 
@@ -474,11 +474,11 @@ t_std_error nas_qos_switch::add_buffer_pool (nas_qos_buffer_pool& p)
 
 void nas_qos_switch::remove_buffer_pool (nas_obj_id_t buffer_pool_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_pool_id in switch: %d", buffer_pool_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_pool_id in switch: %lu", buffer_pool_id);
     release_buffer_pool_id(buffer_pool_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_pool_id from buffer_pool List: %d", buffer_pool_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING buffer_pool_id from buffer_pool List: %lu", buffer_pool_id);
     buffer_pools.erase(buffer_pool_id);
 
     return;
@@ -510,7 +510,7 @@ void nas_qos_switch::remove_priority_group(nas_qos_priority_group_key_t key)
         return;
     }
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING priority_group_id in switch: %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING priority_group_id in switch: %lu",
                 q->get_priority_group_id());
     release_priority_group_id(q->get_priority_group_id());
 
@@ -652,7 +652,7 @@ t_std_error nas_qos_switch::add_map (nas_qos_map& p)
 {
     /* Do NOT allow overwrite of existing entry */
     if (get_map(p.get_map_id())) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "map_id exists: %d", p.get_map_id());
+        EV_LOGGING(QOS, NOTICE, "QOS", "map_id exists: %lu", p.get_map_id());
         throw nas::base_exception {NAS_BASE_E_DUPLICATE, __PRETTY_FUNCTION__, "map Exists"};
     }
 
@@ -663,11 +663,11 @@ t_std_error nas_qos_switch::add_map (nas_qos_map& p)
 
 void nas_qos_switch::remove_map (nas_obj_id_t map_id)
 {
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING map_id in switch: %d", map_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING map_id in switch: %lu", map_id);
     release_map_id(map_id);
 
     // remove from switch
-    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING map_id from map List: %d", map_id);
+    EV_LOGGING(QOS, DEBUG, "QOS", "FREEING map_id from map List: %lu", map_id);
     maps.erase(map_id);
 
     return;
@@ -806,7 +806,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_scheduler_profile_id(nas_obj_id_t id, npu_i
     nas_qos_scheduler* p_scheduler = get_scheduler(id);
 
     if (p_scheduler == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler Profile id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler Profile id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "scheduler profile not found"};
     }
 
@@ -822,7 +822,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_scheduler_group_id(nas_obj_id_t id)
     nas_qos_scheduler_group* p = get_scheduler_group(id);
 
     if (p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler group id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Scheduler group id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "scheduler group not found"};
     }
 
@@ -839,7 +839,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_queue_id(nas_obj_id_t id)
     nas_qos_queue *p = get_queue(id);
 
     if (p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__, "Queue id not found"};
     }
 
@@ -854,7 +854,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_wred_profile_id(nas_obj_id_t id, npu_id_t n
 
     nas_qos_wred* p_wred = get_wred(id);
     if (p_wred == NULL){
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "WRED Profile id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "WRED Profile id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
             "WRED Profile id is not found in ndi yet"};
     }
@@ -870,7 +870,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_map_id(nas_obj_id_t id, npu_id_t npu_id)
 
     nas_qos_map* p_map = get_map(id);
     if (p_map == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "map id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "map id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
             "Map id is not found in ndi yet"};
     }
@@ -887,7 +887,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_buffer_profile_id(nas_obj_id_t id, npu_id_t
 
     nas_qos_buffer_profile* p_buffer_profile = get_buffer_profile(id);
     if (p_buffer_profile == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "buffer profile id %lld is not found.", id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "buffer profile id %lu is not found.", id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
             "Buffer Profile id is not created in ndi yet"};
     }
@@ -904,7 +904,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_pool_id(nas_obj_id_t pool_id, npu_id_t npu_
     nas_qos_buffer_pool* p_pool = get_buffer_pool(pool_id);
 
     if (p_pool == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Pool_id %lld is not found.", pool_id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Pool_id %lu is not found.", pool_id);
         throw nas::base_exception {NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
             "Pool id is not created in ndi yet"};
     }
@@ -921,7 +921,7 @@ ndi_obj_id_t nas_qos_switch::nas2ndi_policer_id(nas_obj_id_t policer_id, npu_id_
 
     nas_qos_policer* p_policer = get_policer(policer_id);
     if (p_policer == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Policer_id %lld is not found.", policer_id);
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Policer_id %lu is not found.", policer_id);
         throw nas::base_exception{NAS_QOS_E_FAIL, __PRETTY_FUNCTION__,
                 "Policer id is not created in ndi yet"};
     }

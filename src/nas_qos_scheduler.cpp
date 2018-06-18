@@ -131,7 +131,7 @@ bool nas_qos_scheduler::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 {
     t_std_error rc = STD_ERR_OK;
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %lu",
                     npu_id, attr_id);
 
 

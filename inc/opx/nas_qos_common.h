@@ -179,5 +179,6 @@ void nas_qos_port_queue_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_i
 void nas_qos_port_scheduler_group_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
 void nas_qos_port_pool_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
 bool nas_qos_port_is_initialized(uint32_t switch_id, hal_ifindex_t port_id);
+char * nas_qos_fmt_error_code(t_std_error ec);
 
 #endif

@@ -326,7 +326,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_create(
 
         p_switch->add_queue(queue);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new queue %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new queue %lu\n",
                      queue.get_queue_id());
 
         if (queue.dirty_attr_list().contains(BASE_QOS_QUEUE_PARENT)) {
@@ -519,14 +519,14 @@ static cps_api_return_code_t nas_qos_cps_api_queue_delete(
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting queue %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting queue %lu on switch: %u\n",
                  queue_p->get_queue_id(), switch_id);
 
     // delete
     try {
         queue_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted queue %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted queue %lu\n",
                      queue_p->get_queue_id());
 
         nas_obj_id_t old_parent_id = queue_p->get_parent();
@@ -604,7 +604,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }
@@ -1264,7 +1264,7 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
 
         stat_attr_capability stat_attr;
         if (_queue_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %lu, ignored", id);
             continue;
         }
 
@@ -1394,7 +1394,7 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
 
         stat_attr_capability stat_attr;
         if (_queue_stat_attr_get(id, &stat_attr) != true) {
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %u, ignored", id);
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %lu, ignored", id);
             continue;
         }
 

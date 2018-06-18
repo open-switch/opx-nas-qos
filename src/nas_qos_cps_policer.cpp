@@ -113,7 +113,7 @@ cps_api_return_code_t nas_qos_cps_api_policer_read (void * context,
     uint_t switch_id = 0;
     nas_obj_id_t policer_id = (policer_attr? cps_api_object_attr_data_u64(policer_attr): 0);
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, policer id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Read switch id %u, policer id %lu\n",
                     switch_id, policer_id);
 
     std_mutex_simple_lock_guard p_m(&policer_mutex);
@@ -268,7 +268,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_create(
         p_switch->add_policer(policer);
         // policer may be changed after add_policer(), use with caution!
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new policer %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new policer %lu\n",
                      policer.policer_id());
 
         // update obj with new policer-id attr and key
@@ -325,7 +325,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_set(
             !=    cps_api_ret_code_OK)
         return rc;
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, policer id %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modify switch id %u, policer id %lu\n",
                     switch_id, policer_id);
 
     nas_qos_policer * policer_p = nas_qos_cps_get_policer(switch_id, policer_id);
@@ -359,7 +359,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_set(
     }
 
     try {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying policer %u attr \n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying policer %lu attr \n",
                      policer.policer_id());
 
         nas::attr_set_t modified_attr_list = policer.commit_modify(*policer_p, (sav_obj? false: true));
@@ -418,13 +418,13 @@ static cps_api_return_code_t nas_qos_cps_api_policer_delete(
 
     nas_qos_policer *policer_p = p_switch->get_policer(policer_id);
     if (policer_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " policer id: %u not found\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", " policer id: %lu not found\n",
                      policer_id);
 
         return NAS_QOS_E_FAIL;
     }
 
-    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting policer %u on switch: %u\n",
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting policer %lu on switch: %u\n",
                  policer_p->policer_id(), p_switch->id());
 
 
@@ -432,7 +432,7 @@ static cps_api_return_code_t nas_qos_cps_api_policer_delete(
     try {
         policer_p->commit_delete(sav_obj? false: true);
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted policer %u\n",
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Saving deleted policer %lu\n",
                      policer_p->policer_id());
 
          // save current policer config for rollback if caller requests it.
@@ -612,7 +612,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             break;
 
         default:
-            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %d", id);
+            EV_LOGGING(QOS, NOTICE, "QOS", "Unrecognized option: %lu", id);
             return NAS_QOS_E_UNSUPPORTED;
         }
     }

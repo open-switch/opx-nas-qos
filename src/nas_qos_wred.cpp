@@ -52,6 +52,126 @@ void* nas_qos_wred::alloc_fill_ndi_obj (nas::mem_alloc_helper_t& m)
     return this;
 }
 
+t_std_error nas_qos_wred::get_cfg_value_by_attr_id(nas_attr_id_t attr_id, uint64_t &value) const
+{
+    switch (attr_id) {
+    case BASE_QOS_WRED_PROFILE_GREEN_ENABLE:
+        value = get_g_enable();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD:
+        value = get_g_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD:
+        value = get_g_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY:
+        value = get_g_drop_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_YELLOW_ENABLE:
+        value = get_y_enable();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD:
+        value = get_y_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD:
+        value = get_y_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY:
+        value = get_y_drop_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_RED_ENABLE:
+        value = get_r_enable();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD:
+        value = get_r_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD:
+        value = get_r_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY:
+        value = get_r_drop_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_GREEN_MIN_THRESHOLD:
+        value = get_ecn_g_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_GREEN_MAX_THRESHOLD:
+        value = get_ecn_g_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_GREEN_PROBABILITY:
+        value = get_ecn_g_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_YELLOW_MIN_THRESHOLD:
+        value = get_ecn_y_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_YELLOW_MAX_THRESHOLD:
+        value = get_ecn_y_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_YELLOW_PROBABILITY:
+        value = get_ecn_y_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_RED_MIN_THRESHOLD:
+        value = get_ecn_r_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_RED_MAX_THRESHOLD:
+        value = get_ecn_r_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_RED_PROBABILITY:
+        value = get_ecn_r_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MIN_THRESHOLD:
+        value = get_ecn_c_min();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MAX_THRESHOLD:
+        value = get_ecn_c_max();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_PROBABILITY:
+        value = get_ecn_c_prob();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_WEIGHT:
+        value = get_weight();
+        break;
+
+    // TO be deprecated
+    case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
+        value = get_ecn_enable();
+        break;
+
+    case BASE_QOS_WRED_PROFILE_ECN_MARK:
+        value = get_ecn_mark();
+        break;
+
+    default:
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "Not configurable attr id %d", attr_id);
+        return STD_ERR(QOS, FAIL, 0);
+    }
+
+    return STD_ERR_OK;
+}
+
 bool nas_qos_wred::push_create_obj_to_npu (npu_id_t npu_id,
                                      void* ndi_obj)
 {
@@ -63,20 +183,40 @@ bool nas_qos_wred::push_create_obj_to_npu (npu_id_t npu_id,
     nas_qos_wred * nas_qos_wred_p = static_cast<nas_qos_wred*> (ndi_obj);
 
     // form attr_list
-    std::vector<uint64_t> attr_list;
-    attr_list.resize(_set_attributes.len());
+    std::vector<nas_attribute_t> nas_attr_list;
+    nas_attribute_t nas_attr;
+    std::vector<uint64_t> val_list;
+    uint64_t val;
+    uint32_t count = 0;
 
-    uint_t num_attr = 0;
     for (auto attr_id: _set_attributes) {
-        if (attr_id != BASE_QOS_WRED_PROFILE_NPU_ID_LIST) {
-            attr_list[num_attr++] = attr_id;
-        }
+
+        // npu-id-list is not handled here
+        if (attr_id == BASE_QOS_WRED_PROFILE_NPU_ID_LIST)
+            continue;
+
+        if (nas_qos_wred_p->get_cfg_value_by_attr_id(attr_id, val) != STD_ERR_OK)
+            continue;
+
+        // temporary store the actual nas_attr.data
+        val_list.push_back(val);
+
+        nas_attr.id = attr_id;
+        nas_attr.len = sizeof(val);
+        // nas_attr.data (pointer) will be filled after val_list is no longer changed
+        nas_attr_list.push_back(nas_attr);
+
+        count++;
     }
 
-    if ((rc = ndi_qos_create_wred_profile (npu_id,
-                                   &attr_list[0],
-                                   num_attr,
-                                   &nas_qos_wred_p->cfg,
+    // update nas_attr.data pointers to the actual storage
+    for (uint32_t idx=0; idx < count; idx++) {
+        nas_attr_list[idx].data = (void *)&(val_list[idx]);
+    }
+
+    if ((rc = ndi_qos_create_wred_ecn_profile (npu_id,
+                                   nas_attr_list.size(),
+                                   &nas_attr_list[0],
                                    &ndi_wred_id))
             != STD_ERR_OK)
     {
@@ -97,7 +237,7 @@ bool nas_qos_wred::push_delete_obj_to_npu (npu_id_t npu_id)
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Deleting obj on NPU %d", npu_id);
 
-    if ((rc = ndi_qos_delete_wred_profile(npu_id, ndi_obj_id(npu_id)))
+    if ((rc = ndi_qos_delete_wred_ecn_profile(npu_id, ndi_obj_id(npu_id)))
         != STD_ERR_OK)
     {
         throw nas::base_exception {rc, __PRETTY_FUNCTION__,
@@ -111,24 +251,38 @@ bool nas_qos_wred::is_leaf_attr (nas_attr_id_t attr_id)
 {
     // Table of function pointers to handle modify of Qos wred
     // attributes.
-    static const std::unordered_map <BASE_QOS_WRED_PROFILE_t,
+    static const std::unordered_map <nas_attr_id_t,
                                      bool,
                                      std::hash<int>>
         _leaf_attr_map =
     {
         // modifiable objects
-        {BASE_QOS_WRED_PROFILE_GREEN_ENABLE,        true},
-        {BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD, true},
-        {BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD,        true},
-        {BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY,     true},
-        {BASE_QOS_WRED_PROFILE_YELLOW_ENABLE,            true},
+        {BASE_QOS_WRED_PROFILE_GREEN_ENABLE,            true},
+        {BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD,     true},
+        {BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD,     true},
+        {BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY,  true},
+        {BASE_QOS_WRED_PROFILE_YELLOW_ENABLE,           true},
         {BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD,    true},
         {BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD,    true},
         {BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY, true},
         {BASE_QOS_WRED_PROFILE_RED_ENABLE,              true},
         {BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD,       true},
-        {BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD,         true},
+        {BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD,       true},
         {BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY,    true},
+
+        {BASE_QOS_WRED_PROFILE_ECN_GREEN_MIN_THRESHOLD,     true},
+        {BASE_QOS_WRED_PROFILE_ECN_GREEN_MAX_THRESHOLD,     true},
+        {BASE_QOS_WRED_PROFILE_ECN_GREEN_PROBABILITY,       true},
+        {BASE_QOS_WRED_PROFILE_ECN_YELLOW_MIN_THRESHOLD,    true},
+        {BASE_QOS_WRED_PROFILE_ECN_YELLOW_MAX_THRESHOLD,    true},
+        {BASE_QOS_WRED_PROFILE_ECN_YELLOW_PROBABILITY,      true},
+        {BASE_QOS_WRED_PROFILE_ECN_RED_MIN_THRESHOLD,       true},
+        {BASE_QOS_WRED_PROFILE_ECN_RED_MAX_THRESHOLD,       true},
+        {BASE_QOS_WRED_PROFILE_ECN_RED_PROBABILITY,         true},
+        {BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MIN_THRESHOLD, true},
+        {BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_MAX_THRESHOLD, true},
+        {BASE_QOS_WRED_PROFILE_ECN_COLOR_UNAWARE_PROBABILITY,   true},
+
         {BASE_QOS_WRED_PROFILE_WEIGHT,        true},
         {BASE_QOS_WRED_PROFILE_ECN_ENABLE,    true},
         {BASE_QOS_WRED_PROFILE_ECN_MARK,      true},
@@ -137,7 +291,7 @@ bool nas_qos_wred::is_leaf_attr (nas_attr_id_t attr_id)
         //The NPU ID list attribute is handled by the base object itself.
     };
 
-    return (_leaf_attr_map.at(static_cast<BASE_QOS_WRED_PROFILE_t>(attr_id)));
+    return (_leaf_attr_map.at(attr_id));
 }
 
 bool nas_qos_wred::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
@@ -145,90 +299,28 @@ bool nas_qos_wred::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
 {
     t_std_error rc = STD_ERR_OK;
 
-    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %d",
+    EV_LOGGING(QOS, DEBUG, "QOS", "Modifying npu: %d, attr_id %lu",
                     npu_id, attr_id);
 
-    qos_wred_struct_t cfg= {0};
-
-    switch (attr_id) {
-    case BASE_QOS_WRED_PROFILE_GREEN_ENABLE:
-        cfg.g_enable = get_g_enable();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_GREEN_MIN_THRESHOLD:
-        cfg.g_min = get_g_min();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_GREEN_MAX_THRESHOLD:
-        cfg.g_max = get_g_max();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_GREEN_DROP_PROBABILITY:
-        cfg.g_drop_prob = get_g_drop_prob();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_YELLOW_ENABLE:
-        cfg.y_enable = get_y_enable();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_YELLOW_MIN_THRESHOLD:
-        cfg.y_min = get_y_min();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_YELLOW_MAX_THRESHOLD:
-        cfg.y_max = get_y_max();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_YELLOW_DROP_PROBABILITY:
-        cfg.y_drop_prob = get_y_drop_prob();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_RED_ENABLE:
-        cfg.r_enable = get_r_enable();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_RED_MIN_THRESHOLD:
-        cfg.r_min = get_r_min();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_RED_MAX_THRESHOLD:
-        cfg.r_max = get_r_max();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_RED_DROP_PROBABILITY:
-        cfg.r_drop_prob = get_r_drop_prob();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_WEIGHT:
-        cfg.weight = get_weight();
-        break;
-
-    // TO be deprecated
-    case BASE_QOS_WRED_PROFILE_ECN_ENABLE:
-        cfg.ecn_mark = (BASE_QOS_ECN_MARK_MODE_t)get_ecn_enable();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_ECN_MARK:
-        cfg.ecn_mark = get_ecn_mark();
-        break;
-
-    case BASE_QOS_WRED_PROFILE_NPU_ID_LIST:
+    if (attr_id == BASE_QOS_WRED_PROFILE_NPU_ID_LIST)
         // handled separately, not here
-        break;
+        return true;
 
-    default:
-            STD_ASSERT (0); //non-modifiable object
-    }
+    nas_attribute_t nas_attr;
+    nas_attr.id = attr_id;
+    uint64_t val;
+    if (get_cfg_value_by_attr_id(attr_id, val) != STD_ERR_OK)
+        return true;
 
-    if (attr_id != BASE_QOS_WRED_PROFILE_NPU_ID_LIST) {
-        rc = ndi_qos_set_wred_profile_attr(npu_id,
-                                   ndi_obj_id(npu_id),
-                                   (BASE_QOS_WRED_PROFILE_t)attr_id,
-                                   &cfg);
-        if (rc != STD_ERR_OK) {
-            throw nas::base_exception {rc, __PRETTY_FUNCTION__,
-                "NDI attribute Set Failed"};
-        }
+    nas_attr.data = (void *)&val;
+    nas_attr.len = sizeof(val);
+
+    rc = ndi_qos_set_wred_ecn_profile_attr(npu_id,
+                               ndi_obj_id(npu_id),
+                               nas_attr);
+    if (rc != STD_ERR_OK) {
+        throw nas::base_exception {rc, __PRETTY_FUNCTION__,
+            "NDI attribute Set Failed"};
     }
 
     return true;
