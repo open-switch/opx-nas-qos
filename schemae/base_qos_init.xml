@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Written to XSD 1.0; uncomment assertions and use XSD 1.1 checker for more strict checking -->
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <!-- ==========================================================================
+
+  Type definitions
+
+  =========================================================================== -->
+  
+  <!-- Queue type is one of: "UCAST", "MULTICAST" -->
+  <xs:simpleType name="queue-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="UCAST"/>
+      <xs:enumeration value="MULTICAST"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- 802.1p PCP is a number from 0 to 7 inclusive -->
+  <xs:simpleType name="dot1p">
+    <xs:restriction base="xs:unsignedInt">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="7"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- 802.1p PCP or "all" -->
+  <xs:simpleType name="dot1p-or-all">
+    <xs:union>
+      <xs:simpleType>
+        <xs:restriction base="dot1p"/>
+      </xs:simpleType>
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="all"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:union>
+  </xs:simpleType>
+
+  <!-- DSCP is a number from 0 to 63 -->
+  <xs:simpleType name="dscp">
+    <xs:restriction base="xs:unsignedInt">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="63"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- DSCP or "all" -->
+  <xs:simpleType name="dscp-or-all">
+    <xs:union>
+      <xs:simpleType>
+        <xs:restriction base="dscp"/>
+      </xs:simpleType>
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="all"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:union>
+  </xs:simpleType>
+
+  <!-- Traffic class is an unsigned integer -->
+  <xs:simpleType name="tc">
+    <xs:restriction base="xs:unsignedInt"/>
+  </xs:simpleType>
+
+  <!-- Traffic class or "all" -->
+  <xs:simpleType name="tc-or-all">
+    <xs:union>
+      <xs:simpleType>
+        <xs:restriction base="tc"/>
+      </xs:simpleType>
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="all"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:union>
+  </xs:simpleType>
+
+  <!-- Color ir one of: "RED", "YELLOW", "GREEN" -->
+  <xs:simpleType name="color">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="RED"/>
+      <xs:enumeration value="YELLOW"/>
+      <xs:enumeration value="GREEN"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ==========================================================================
+
+  Element defintions
+
+  =========================================================================== -->
+
+  <!-- ==========================================================================
+
+  scheduler-hierarchy-tree - Element to define queue scheduling hierarchy
+
+  =========================================================================== -->
+  <xs:element name="scheduler-hierarchy-tree">
+    <xs:complexType>
+      <xs:sequence>
+        <!-- Scheduling node -->
+        <xs:element name="nodes" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:choice>
+              <xs:element name="scheduler-group" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute type="xs:unsignedInt" name="number"            use="required"/>
+                  <xs:attribute type="xs:string"      name="scheduler-profile" use="required"/>
+                </xs:complexType>
+              </xs:element>
+              
+              <xs:element name="queue" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute type="xs:unsignedInt" name="number"            use="required"/>
+                  <xs:attribute type="queue-type"     name="type"              use="required"/>
+                  <xs:attribute type="xs:string"      name="scheduler-profile"/>
+                  <xs:attribute type="xs:string"      name="buffer-profile"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:choice>
+            <!-- Node level -->
+            <xs:attribute type="xs:unsignedInt" name="level" use="required"/>
+            <!-- Flag to indicate if node is root -->
+            <xs:attribute type="xs:boolean"     name="root"  use="required"/>
+            <!-- Flag to indicate if node is leaf -->
+            <xs:attribute type="xs:boolean"     name="leaf"  use="required"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ==========================================================================
+
+  priority-group - Element to define priority group
+
+  =========================================================================== -->
+  <xs:element name="priority-group">
+    <xs:complexType>
+      <xs:attribute type="xs:unsignedInt" name="local-id"       use="required"/>
+      <xs:attribute type="xs:string"      name="buffer-profile" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ==========================================================================
+
+  root - Root element
+
+  =========================================================================== -->
+  <xs:element name="root">
+    <xs:complexType>
+      <xs:all>
+        <!-- ==========================================================================
+
+        SWITCH-GLOBALS - Element defitions (mappings, etc.) for ports
+
+        =========================================================================== -->
+        <xs:element name="SWITCH-GLOBALS">
+          <xs:complexType>
+            <xs:sequence>
+              <!-- ==========================================================================
+
+              dot1p-to-tc-map - Element to define named ingress mapping from 802.1P PCP to traffic class
+
+              =========================================================================== -->
+              <xs:element name="dot1p-to-tc-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="dot1p-or-all" name="dot1p" use="required"/>
+                        <xs:attribute type="tc"           name="tc"    use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of dot1p values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with dot1p as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@dot1p='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              dot1p-to-color-map - Element to define named ingress mapping from 802.1P PCP to color
+
+              =========================================================================== -->
+              <xs:element name="dot1p-to-color-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="dot1p-or-all" name="dot1p" use="required"/>
+                        <xs:attribute type="color"        name="color" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of dot1p values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with dot1p as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@dot1p='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              dscp-to-tc-map - Element to define named ingress mapping from DSCP to traffic class
+
+              =========================================================================== -->
+              <xs:element name="dscp-to-tc-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="dscp-or-all" name="dscp" use="required"/>
+                        <xs:attribute type="tc"          name="tc"   use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of DSCP values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with dscp as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@dscp='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              dscp-to-color-map - Element to define named ingress mapping from DSCP to color
+
+              =========================================================================== -->
+              <xs:element name="dscp-to-color-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="dscp-or-all" name="dscp"  use="required"/>
+                        <xs:attribute type="color"       name="color" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of DSCP values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with dscp as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@dscp='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              tc-color-to-dot1p-map - Element to define named egress mapping from color to 802.1p PCP
+
+              =========================================================================== -->
+              <xs:element name="tc-color-to-dot1p-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="color" name="color" use="required"/>
+                        <xs:attribute type="dot1p" name="dot1p" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string" name="tag" use="required"/>
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              tc-color-to-dscp-map - Element to define named egress mapping from color to DSCP
+
+              =========================================================================== -->
+              <xs:element name="tc-color-to-dscp-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="color" name="color" use="required"/>
+                        <xs:attribute type="dscp"  name="dscp"  use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string" name="tag" use="required"/>
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              tc-to-queue-map - Element to define named egress mapping from traffic class to queue
+
+              =========================================================================== -->
+              <xs:element name="tc-to-queue-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="tc-or-all"      name="tc"           use="required"/>
+                        <xs:attribute type="queue-type"     name="type"         use="required"/>
+                        <xs:attribute type="xs:unsignedInt" name="queue-number" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Mapping name -->
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of traffic class values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with tc as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@tc='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              tc-to-priority-group-map = Element to define named egress mapping from traffic class to priority group
+
+              =========================================================================== -->
+              <xs:element name="tc-to-priority-group-map" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- Mapping entry -->
+                    <xs:element name="entry" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute type="tc-or-all"      name="tc"             use="required"/>
+                        <xs:attribute type="xs:unsignedInt" name="priority-group" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute type="xs:string"      name="tag" use="required"/>
+                  <!-- Range of traffic class values when 'all' is specified -->
+                  <xs:attribute type="xs:unsignedInt" name="min"/>
+                  <xs:attribute type="xs:unsignedInt" name="max"/>
+                  <!-- Range required if one entry with tc as all -->
+                  <!-- <xs:assert test="(if (fn:count(./entry[@tc='all']) gt 0) then 1 else 0) eq fn:count(*[@min]) and fn:count(*[@max]) eq fn:count(*[@min])"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              scheduler-profile - Element to define a named scheduler profile
+
+              =========================================================================== -->
+              <xs:element name="scheduler-profile" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute type="xs:string" name="name" use="required"/>
+                  <xs:attribute name="algorithm" use="required">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:string">
+                        <xs:enumeration value="SP"/>
+                        <xs:enumeration value="WRR"/>
+                        <xs:enumeration value="WDRR"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:attribute>
+                  <xs:attribute type="xs:unsignedInt" name="weight"/>
+                  <xs:attribute type="xs:unsignedInt" name="min-rate"/>
+                  <xs:attribute type="xs:unsignedInt" name="min-burst"/>
+                  <xs:attribute type="xs:unsignedInt" name="max-rate"/>
+                  <xs:attribute type="xs:unsignedInt" name="max-burst"/>
+                  <xs:attribute name="meter-type">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:string">
+                        <xs:enumeration value="BYTE"/>
+                        <xs:enumeration value="PACKET"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:attribute>
+                  <!-- Weight required iff algorithm one of {WRR, WDRR} -->
+                  <!-- <xs:assert test="fn:count(*[@weight]) eq (if (@algoritm eq 'WRR' or @algoritm eq 'WDRR') then 1 else 0)"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+
+              <!-- ==========================================================================
+
+              buffer-profile - Element to define a named buffer profile
+
+              =========================================================================== -->
+              <xs:element name="buffer-profile" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute type="xs:string"      name="name"        use="required"/>
+                  <xs:attribute type="xs:unsignedInt" name="buffer-size" use="required"/>
+                  <xs:attribute name="threshold-mode" use="required">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:string">
+                        <xs:enumeration value="STATIC"/>
+                        <xs:enumeration value="DYNAMIC"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:attribute>
+                  <xs:attribute type="xs:unsignedInt" name="xoff-threshold"/>
+                  <xs:attribute type="xs:unsignedInt" name="xon-threshold"/>
+                  <xs:attribute type="xs:unsignedInt" name="shared-static-threshold"/>
+                  <xs:attribute type="xs:unsignedInt" name="shared-dynamic-threshold"/>
+                  <!-- Threshold required per given threshold mode -->
+                  <!-- <xs:assert test="fn:count(*[@shared-static-threshold]) eq (if (@threshold-mode eq 'STATIC') then 1 else 0) and fn:count(*[@shared-dynamic-threshold]) eq (if (@threshold-mode eq 'DYNAMIC') then 1 else 0)"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute type="xs:unsignedInt" name="total-buffer" use="required"/>
+          </xs:complexType>
+        </xs:element>
+
+        <!-- ==========================================================================
+
+        FRONT-PANEL-PORTS = Element to define configuration of front-panel ports
+
+        =========================================================================== -->
+        <xs:element name="FRONT-PANEL-PORTS">
+          <xs:complexType>
+            <xs:sequence>
+              <!-- Configuration of a port or range of ports -->
+              <xs:element name="port" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:all>
+                    <!-- Ingress mappings, defined above -->
+                    <xs:element name="ingress" minOccurs="0">
+                      <xs:complexType>
+                        <xs:all>
+                          <xs:element type="xs:string" name="dot1p-to-tc-map"          minOccurs="0"/>
+                          <xs:element type="xs:string" name="dot1p-to-color-map"       minOccurs="0"/>
+                          <xs:element type="xs:string" name="dscp-to-tc-map"           minOccurs="0"/>
+                          <xs:element type="xs:string" name="dscp-to-color-map"        minOccurs="0"/>
+                        </xs:all>
+                      </xs:complexType>
+                    </xs:element>
+
+                    <!-- Egress mappings, defined above -->
+                    <xs:element name="egress" minOccurs="0">
+                      <xs:complexType>
+                        <xs:all>
+                          <xs:element type="xs:string" name="tc-to-queue-map"          minOccurs="0"/>
+                          <xs:element type="xs:string" name="tc-to-priority-group-map" minOccurs="0"/>
+                        </xs:all>
+                      </xs:complexType>
+                    </xs:element>
+
+                    <xs:element ref="scheduler-hierarchy-tree" minOccurs="0"/>
+
+                    <xs:element ref="priority-group" minOccurs="0"/>
+                  </xs:all>
+                  <!-- Single port to configure -->
+                  <xs:attribute type="xs:string" name="port"/>
+                  <!-- Range of ports to configure -->
+                  <xs:attribute type="xs:string" name="from"/>
+                  <xs:attribute type="xs:string" name="to"/>
+                  <!-- Either a single port or range must be specified -->
+                  <!-- <xs:assert test="fn:count(*[@port]) eq 1 and fn:count(*[@from]) eq 0 and fn:count(*[@to]) eq 0 or fn:count(*[@port]) eq 0 and fn:count(*[@from]) eq 1 and fn:count(*[@to]) eq 1"/>
+                  -->
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:element name="CPU-PORT">
+          <xs:complexType>
+            <xs:all>
+              <xs:element ref="scheduler-hierarchy-tree" minOccurs="0"/>
+
+              <xs:element name="priority-group" minOccurs="0"/>
+            </xs:all>
+          </xs:complexType>
+        </xs:element>
+      </xs:all>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
