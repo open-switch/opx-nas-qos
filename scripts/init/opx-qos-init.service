@@ -1,7 +1,7 @@
 [Unit]
 Description=QoS default initialization
-After=opx-cps.service opx-create-interface.service
-Wants=opx-cps.service opx-create-interface.service
+After=opx-cps.service opx-nas.service opx-create-interface.service
+Wants=opx-cps.service opx-nas.service opx-create-interface.service
 
 [Service]
 Type=oneshot
