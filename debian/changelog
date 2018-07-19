@@ -1,7 +1,13 @@
+opx-nas-qos (2.4.0+opx2) unstable; urgency=medium
+
+  * Bugfix: service startup dependencies
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Tue, 18 Jul 2018 14:00:00 -0800
+
 opx-nas-qos (2.4.0+opx1) unstable; urgency=medium
 
-    * Feature: Added ability to run base_qos_init.py script multiple times
-    * Update: Added schema for configuration file for base_qos_init.xml
+  * Feature: Added ability to run base_qos_init.py script multiple times
+  * Update: Added schema for configuration file for base_qos_init.xml
 
  -- Dell EMC <ops-dev@lists.openswitch.net>  Tue, 13 Jul 2018 14:00:00 -0800
 
