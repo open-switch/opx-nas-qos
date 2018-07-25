@@ -1,12 +1,13 @@
 [Unit]
 Description=QoS default initialization
-After=opx-cps.service opx-create-interface.service
-Wants=opx-cps.service opx-create-interface.service
+After=opx-cps.service opx-nas.service opx-create-interface.service
+Requires=opx-cps.service opx-nas.service opx-create-interface.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/base_qos_init.sh
+TimeoutStartSec=90
 
 [Install]
 WantedBy=multi-user.target
