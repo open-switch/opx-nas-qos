@@ -47,7 +47,7 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
 
     } catch (std::out_of_range&) {
 
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS",
                      "Creating Switch id %d from inventory", switch_id);
 
         nas_qos_switch * p_switch = new nas_qos_switch(switch_id);
@@ -56,7 +56,8 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
         const nas_switch_detail_t* sw =  nas_switch (switch_id);
         if (sw == NULL) {
             // No such switch id in our inventory
-            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Switch id %d does not exist", switch_id);
+            EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Switch id %d does not exist", switch_id);
+            delete p_switch;
             return NULL;
         }
 
@@ -90,6 +91,8 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
             return NULL;
         }
         else {
+            EV_LOGGING(QOS, NOTICE, "NAS-QOS",
+                         "Successfully created Switch id %d from inventory", switch_id);
             return nas_qos_switch_list_cache.at(switch_id);
         }
     }
@@ -110,12 +113,14 @@ t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch* s)
     nas_qos_switch *p = ((si != nas_qos_switch_list_cache.end())? (si->second): NULL);
 
     if (p) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Switch id %d exists already", switch_id);
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Switch id %d exists already", switch_id);
         return NAS_BASE_E_DUPLICATE;
     }
 
     try {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Inserting Switch id %d ", switch_id);
         nas_qos_switch_list_cache.insert(std::make_pair(switch_id, s));
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Successfully inserted Switch id %d ", switch_id);
     }
     catch (...) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Failed to insert a new switch id %u", switch_id);
@@ -133,7 +138,9 @@ t_std_error nas_qos_add_switch (uint_t switch_id, nas_qos_switch* s)
 t_std_error nas_qos_remove_switch (uint32_t switch_id)
 {
     try {
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Deleting switch id %u ", switch_id);
         nas_qos_switch_list_cache.erase(switch_id);
+        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Successfully deleted switch id %u ", switch_id);
     }
     catch (...) {
         EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Failed to delete switch id %u", switch_id);

@@ -1,3 +1,10 @@
+opx-nas-qos (2.4.0+vxlan1) unstable; urgency=medium
+
+  * Update: Insert debug info in the journal log for future debuggging
+  * Update: Save qos map name during creation
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 25 Jul 2018 15:45:18 -0800
+
 opx-nas-qos (2.4.0) unstable; urgency=medium
 
   * Feature: Routing VRF
