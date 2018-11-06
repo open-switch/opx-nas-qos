@@ -175,7 +175,6 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
 }
 
 
-
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                     const nas::attr_set_t& attr_set,
                                                     const nas_qos_port_ingress& port_ing)
@@ -381,6 +380,7 @@ static void nas_qos_port_ingress_fetch_from_hw(ndi_port_t ndi_port_id,
     };
     qos_port_ing_struct_t ndi_info;
 
+
     memset(&ndi_info, 0, sizeof(qos_port_ing_struct_t));
     ndi_info.priority_group_id_list = pg_id_list;
     ndi_info.num_priority_group_id = MAX_PRIORITY_GROUP_ID_NUM;
@@ -407,7 +407,7 @@ static void nas_qos_port_ingress_fetch_from_hw(ndi_port_t ndi_port_id,
 
     nas_qos_switch *p_switch = nas_qos_get_switch(0);
     if (p_switch == NULL) {
-        return;
+        return ;
     }
 
     port_ing->set_default_traffic_class(ndi_info.default_tc);

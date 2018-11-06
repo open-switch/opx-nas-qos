@@ -45,7 +45,6 @@ void nas_qos_map_entry::commit_create (bool rolling_back)
 
 {
     switch (type) {
-
     case NDI_QOS_MAP_DOT1P_TO_TC:
         if (!is_attr_dirty (BASE_QOS_DOT1P_TO_TC_MAP_ENTRY_TC)) {
             throw nas::base_exception {NAS_BASE_E_CREATE_ONLY,
@@ -61,7 +60,6 @@ void nas_qos_map_entry::commit_create (bool rolling_back)
                             "Mandatory attribute COLOR not present"};
         }
         break;
-
 
     case NDI_QOS_MAP_DSCP_TO_TC:
         if (!is_attr_dirty (BASE_QOS_DSCP_TO_TC_MAP_ENTRY_TC)) {
@@ -314,7 +312,6 @@ t_std_error nas_qos_map_entry::get_ndi_default_qid(ndi_obj_id_t &ndi_qid)
     }
     return STD_ERR_OK;
 }
-
 
 t_std_error  nas_qos_map_entry::get_ndi_map_id(npu_id_t npu_id, ndi_obj_id_t * ndi_map_id)
 {

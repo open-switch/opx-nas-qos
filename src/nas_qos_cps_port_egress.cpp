@@ -129,7 +129,6 @@ static cps_api_return_code_t nas_qos_cps_parse_attr(cps_api_object_t obj,
     return cps_api_ret_code_OK;
 }
 
-
 static cps_api_return_code_t nas_qos_store_prev_attr(cps_api_object_t obj,
                                                     const nas::attr_set_t& attr_set,
                                                     const nas_qos_port_egress& port_eg)
@@ -312,7 +311,6 @@ static void nas_qos_port_egress_fetch_from_hw(ndi_port_t ndi_port_id,
         BASE_QOS_PORT_EGRESS_PFC_PRIORITY_TO_QUEUE_MAP,
         BASE_QOS_PORT_EGRESS_BUFFER_PROFILE_ID_LIST,
     };
-    
     int attr_num = sizeof(attr_list)/sizeof(attr_list[0]);
     for (int idx = 0; idx < attr_num; idx ++) {
         // Get attributes one at a time so that we can skip any unsupported SAI attributes
@@ -337,7 +335,7 @@ static void nas_qos_port_egress_fetch_from_hw(ndi_port_t ndi_port_id,
 
     nas_qos_switch *p_switch = nas_qos_get_switch(0);
     if (p_switch == NULL) {
-        return;
+        return ;
     }
 
     port_egr->set_buffer_limit(ndi_info.buffer_limit);
@@ -443,6 +441,7 @@ void nas_qos_port_egress_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_
         }
     }
 }
+
 
 static cps_api_return_code_t get_cps_obj_switch_port_id(cps_api_object_t obj,
                                                 uint_t& switch_id, uint_t& port_id)

@@ -516,8 +516,7 @@ def bind_q_profile(key_tuple, scheduler_profile_id, buffer_profile_id):
         'queue-number': key_tuple[2],
     }
     q_obj = nas_qos.QueueCPSObj(map_of_attr=attr_list)
-    if (scheduler_profile_id):
-        q_obj.set_attr('scheduler-profile-id', scheduler_profile_id)
+    q_obj.set_attr('scheduler-profile-id', scheduler_profile_id)
     if (buffer_profile_id):
         q_obj.set_attr('buffer-profile-id', buffer_profile_id)
 

@@ -241,6 +241,7 @@ cps_api_return_code_t nas_qos_cps_api_write (void * context,
     case BASE_QOS_PORT_POOL_STAT_OBJ:
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BASE_QOS_PORT_POOL_STAT_OBJ");
         return nas_qos_cps_api_port_pool_stat_clear(context, param, ix);
+
     default:
         return NAS_QOS_E_UNSUPPORTED;
 

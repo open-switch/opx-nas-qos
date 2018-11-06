@@ -84,6 +84,7 @@ public:
 
     uint32_t    get_xoff_size() const {return cfg.xoff_size;}
     void        set_xoff_size(uint32_t size) {cfg.xoff_size = size;}
+
     BASE_QOS_BUFFER_POOL_TYPE_t get_type() const {return cfg.type;}
     void  set_type(BASE_QOS_BUFFER_POOL_TYPE_t type) {cfg.type = type;}
 

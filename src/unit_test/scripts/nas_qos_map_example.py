@@ -121,6 +121,7 @@ if __name__ == '__main__':
     d2color_id = create_ing_map('dot1p-to-color-map', d2color_entries, map_name=map_name)
     set_port_ing_map('e101-003-0', d2color_id, 'dot1p-to-color-map')
 
+
     # Each tuple in the list has the following form (tc, queue-type,
     # queue-number)
     tc2q_entries = [(0, 'UCAST', 0), (0, 'MULTICAST', 0),

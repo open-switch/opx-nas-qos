@@ -186,7 +186,6 @@ def enum_map_get():
         'base-qos:buffer-threshold-mode:STATIC': 1,
         'base-qos:buffer-threshold-mode:DYNAMIC': 2,
 
-
         'base-qos:ecn-mark-mode:NONE': 0,
         'base-qos:ecn-mark-mode:GREEN': 1,
         'base-qos:ecn-mark-mode:YELLOW': 2,

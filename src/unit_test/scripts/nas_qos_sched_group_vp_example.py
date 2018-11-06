@@ -207,5 +207,3 @@ if __name__ == '__main__':
     # read the tree out
     sg_id_list = scheduler_group_get_example(port_id=port_id, level=2)
 
-
-

@@ -520,6 +520,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             buffer_profile.mark_attr_dirty(id);
             buffer_profile.set_xon_offset_th(val);
             break;
+
         case BASE_QOS_BUFFER_PROFILE_NAME:
             ptr = (char *)cps_api_object_attr_data_bin(it.attr);
             buffer_profile.set_name(ptr);

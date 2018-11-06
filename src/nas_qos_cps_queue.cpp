@@ -313,10 +313,11 @@ static cps_api_return_code_t nas_qos_cps_api_queue_create(
     }
     queue.set_ndi_port_id(intf_ctrl.npu_id, intf_ctrl.port_id);
 
-   if (nas_qos_cps_parse_attr(obj, queue) != cps_api_ret_code_OK)
+    if (nas_qos_cps_parse_attr(obj, queue) != cps_api_ret_code_OK)
         return NAS_QOS_E_FAIL;
 
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     try {
         queue_id = p_switch->alloc_queue_id();
 
@@ -403,6 +404,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
     key.port_id = port_id;
     key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
     key.local_queue_id = queue_num;
+
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
@@ -414,6 +416,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     nas_qos_queue *queue_p = p_switch->get_queue(key);
+
     if (queue_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                         "Queue not found in switch id %u\n",
@@ -509,6 +512,7 @@ static cps_api_return_code_t nas_qos_cps_api_queue_delete(
     key.port_id = port_id;
     key.type = (BASE_QOS_QUEUE_TYPE_t)queue_type;
     key.local_queue_id = queue_num;
+
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     nas_qos_queue * queue_p = p_switch->get_queue(key);
@@ -1269,8 +1273,8 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
         }
 
         if (stat_attr.read_ok) {
-                counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
-            }
+            counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
+        }
     }
 
     if (counter_ids.size() == 0) {
@@ -1399,7 +1403,7 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
         }
 
         if (stat_attr.write_ok) {
-                counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
+            counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
         }
     }
 

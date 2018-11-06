@@ -257,6 +257,7 @@ static cps_api_return_code_t nas_qos_cps_api_priority_group_set(
     nas_qos_priority_group_key_t key;
     key.port_id = port_id;
     key.local_id = local_id;
+
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",

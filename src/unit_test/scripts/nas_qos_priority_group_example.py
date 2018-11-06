@@ -13,7 +13,7 @@
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
 
-# Before running this test on BASE, do "touch /etc/opt/dell/os10/base_qos_no_init" and reboot
+# Before running this test on BASE, do "touch /etc/opx/base_qos_no_init" and reboot
 
 import cps_utils
 import cps

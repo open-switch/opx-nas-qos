@@ -76,7 +76,7 @@ static bool _yang_obj_id_to_nas_type_get(nas_attr_id_t attr_id, nas_qos_map_type
                 {BASE_QOS_PFC_PRIORITY_TO_QUEUE_MAP_OBJ,
                     NDI_QOS_MAP_PFC_TO_QUEUE,
                 },
-        };
+    };
 
     try {
         *ndi_map_type = _yang_obj_id_to_nas_type_map.at(attr_id);
@@ -86,6 +86,8 @@ static bool _yang_obj_id_to_nas_type_get(nas_attr_id_t attr_id, nas_qos_map_type
     }
     return true;
 }
+
+
 /**
   * This function provides NAS-QoS Map CPS API write function
   * @Param    Standard CPS API params
@@ -108,6 +110,7 @@ cps_api_return_code_t nas_qos_cps_api_map_write(void * context,
     nas_qos_map_type_t map_type;
     if (_yang_obj_id_to_nas_type_get(subcat_id, &map_type) != true)
         return NAS_QOS_E_FAIL;
+
     rc = nas_qos_cps_api_map_write_type(context, param, ix, map_type);
 
     return rc;
@@ -166,6 +169,7 @@ cps_api_return_code_t nas_qos_cps_api_map_rollback(void * context,
     nas_qos_map_type_t map_type;
     if (_yang_obj_id_to_nas_type_get(subcat_id, &map_type) != true)
         return NAS_QOS_E_FAIL;
+
     rc = nas_qos_cps_api_map_rollback_type(context, param, ix, map_type);
 
     return rc;

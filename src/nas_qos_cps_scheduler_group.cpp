@@ -105,6 +105,7 @@ static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
                                     const ndi_qos_scheduler_group_struct_t& sg_info,
                                     nas_obj_id_t& nas_sg_id)
 {
+
     nas_qos_switch *p_switch = nas_qos_get_switch_by_npu(ndi_port_id.npu_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, NOTICE, "QOS-SG",
@@ -133,6 +134,7 @@ static t_std_error create_port_scheduler_group(hal_ifindex_t port_id,
                     "Allocate nas-sg-id 0x%016lX for port_id %d, level %d, local_sg_index %d",
                     nas_sg_id, port_id, sg_info.level, local_sg_index);
         nas_qos_scheduler_group sg(p_switch);
+
         sg.set_scheduler_group_id(nas_sg_id);
         sg.add_npu(ndi_port_id.npu_id);
         sg.set_port_id(port_id);
@@ -665,6 +667,7 @@ cps_api_return_code_t nas_qos_cps_api_scheduler_group_read (void * context,
         return NAS_QOS_E_FAIL;
 
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     std::vector<nas_qos_scheduler_group *> sg_list;
     if (sg_attr) {
         nas_qos_scheduler_group *scheduler_group = p_switch->get_scheduler_group(scheduler_group_id);
@@ -773,6 +776,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_create(
         return NAS_QOS_E_FAIL;
 
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     try {
         scheduler_group_id = p_switch->alloc_scheduler_group_id();
 
@@ -960,6 +964,7 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_delete(
     }
 
     std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
+
     nas_qos_scheduler_group *scheduler_group_p = p_switch->get_scheduler_group(scheduler_group_id);
     if (scheduler_group_p == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", " scheduler_group id: %lu not found\n",
