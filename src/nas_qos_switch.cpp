@@ -112,7 +112,6 @@ t_std_error nas_qos_switch::add_queue(nas_qos_queue &q)
 
 void nas_qos_switch::remove_queue(nas_qos_queue_key_t key)
 {
-
     nas_qos_queue * q = get_queue(key);
     if (q == NULL) {
         EV_LOGGING(QOS, NOTICE, "QOS", "Key not found ");
@@ -416,6 +415,7 @@ bool nas_qos_switch::delete_sg_by_ifindex(hal_ifindex_t port_id)
     }
     return true;
 }
+
 /***************** Buffer Profile *************************/
 
 nas_qos_buffer_profile * nas_qos_switch::get_buffer_profile(nas_obj_id_t buffer_profile_id)

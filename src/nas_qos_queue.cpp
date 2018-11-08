@@ -79,7 +79,7 @@ bool nas_qos_queue::push_create_obj_to_npu (npu_id_t npu_id,
 
     // form attr_list
     std::vector<uint64_t> attr_list;
-    // Mandatory keys {Port-id, type, queue-number} must be manually added during cps-create 
+    // Mandatory keys {Port-id, type, queue-number} must be manually added during cps-create
     // These 3 attributes are not marked-dirty because cps-set cannot alter them but use them to get ndi-qid
     attr_list.resize(_set_attributes.len() + 3);
 

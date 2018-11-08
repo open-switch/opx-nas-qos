@@ -180,6 +180,7 @@ bool nas_qos_buffer_pool::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
     qos_buffer_pool_struct_t ndi_cfg= {0};
 
     nas_qos_switch & nas_switch = const_cast<nas_qos_switch &>(get_switch());
+
     switch (attr_id) {
     case BASE_QOS_BUFFER_POOL_POOL_TYPE:
         ndi_cfg.type = get_type();

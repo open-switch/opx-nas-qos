@@ -388,6 +388,18 @@ static cps_api_return_code_t nas_qos_cps_api_map_create(
             map.set_map_id(map_id);
             map.commit_create(sav_obj? false: true);
 
+            // save the map name if specified
+            nas_attr_id_t name_obj_id = qos_map_map_name_obj_id(map_type);
+            cps_api_object_it_t it;
+            cps_api_object_it_begin(obj,&it);
+            for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
+                cps_api_attr_id_t id = cps_api_object_attr_id(it.attr);
+                if (id == name_obj_id) {
+                    char * ptr = (char *)cps_api_object_attr_data_bin(it.attr);
+                    map.set_name(ptr);
+                }
+            }
+
             p_switch->add_map(map);
 
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Created new map %lu\n",

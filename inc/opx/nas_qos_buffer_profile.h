@@ -94,6 +94,7 @@ public:
 
     uint32_t get_xon_th() const {return cfg.xon_th;}
     void     set_xon_th(uint32_t th) {cfg.xon_th = th;}
+
     uint32_t get_xon_offset_th() const {return cfg.xon_offset_th;}
     void     set_xon_offset_th(uint32_t th) {cfg.xon_offset_th = th;}
 

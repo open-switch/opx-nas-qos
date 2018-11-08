@@ -185,6 +185,7 @@ static cps_api_return_code_t _append_one_buffer_pool(cps_api_get_params_t * para
 
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_BUFFER_POOL_WRED_PROFILE_ID,
             buffer_pool->get_wred_profile_id());
+
     return cps_api_ret_code_OK;
 }
 
@@ -496,6 +497,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
             buffer_pool.mark_attr_dirty(id);
             buffer_pool.set_wred_profile_id(lval);
             break;
+
         case CPS_API_ATTR_RESERVE_RANGE_END:
             // skip keys
             break;

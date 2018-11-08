@@ -471,6 +471,7 @@ static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
         cps_api_attr_id_t id = cps_api_object_attr_id(it.attr);
+
         // skip keys and unprocessed fields
         if (id == BASE_QOS_WRED_PROFILE_SWITCH_ID ||  //keys
             id == BASE_QOS_WRED_PROFILE_ID ||  //keys

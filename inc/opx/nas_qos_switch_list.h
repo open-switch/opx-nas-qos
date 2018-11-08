@@ -63,6 +63,7 @@ nas_qos_switch * nas_qos_get_switch_by_npu(npu_id_t npu_id);
  * @Return True if the interface structure is properly filled; False otherwise
  */
 bool nas_qos_get_port_intf(uint_t ifindex, interface_ctrl_t *intf_ctrl);
+
 /*
  *  This function cleans up an interface related data structure
  *  @Param ifindex
