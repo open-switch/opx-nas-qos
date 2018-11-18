@@ -438,7 +438,8 @@ static cps_api_return_code_t nas_qos_cps_api_queue_set(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying switch id %u, port id %u queue info \n",
                 switch_id, port_id);
 
-        if (!nas_is_virtual_port(port_id)) {
+        if (!nas_is_virtual_port(port_id) &&
+            queue_p->is_created_in_ndi()) {
             nas::attr_set_t modified_attr_list = queue.commit_modify(*queue_p, (sav_obj? false: true));
 
             if (queue.dirty_attr_list().contains(BASE_QOS_QUEUE_PARENT)) {
@@ -1113,94 +1114,162 @@ void dump_nas_qos_queues(nas_switch_id_t switch_id, hal_ifindex_t port_id)
 
 }
 
-static bool _queue_stat_attr_get(nas_attr_id_t attr_id, stat_attr_capability * p_stat_attr)
+static const auto &  _queue_stat_attr_map =
+* new std::unordered_map<nas_attr_id_t, stat_attr_capability, std::hash<int>>
 {
+    {BASE_QOS_QUEUE_STAT_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_DISCARD_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_DISCARD_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_DISCARD_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_DISCARD_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_DISCARD_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_DISCARD_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_DISCARD_DROPPED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_DISCARD_DROPPED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_CURRENT_OCCUPANCY_BYTES,
+        {true, false,true}},
+    {BASE_QOS_QUEUE_STAT_WATERMARK_BYTES,
+        {true, true, true}},
+    {BASE_QOS_QUEUE_STAT_SHARED_CURRENT_OCCUPANCY_BYTES,
+        {true, false, true}},
+    {BASE_QOS_QUEUE_STAT_SHARED_WATERMARK_BYTES,
+        {true, true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_WRED_ECN_MARKED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_GREEN_WRED_ECN_MARKED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_WRED_ECN_MARKED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_YELLOW_WRED_ECN_MARKED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_WRED_ECN_MARKED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_RED_WRED_ECN_MARKED_BYTES,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_WRED_ECN_MARKED_PACKETS,
+        {true, true}},
+    {BASE_QOS_QUEUE_STAT_WRED_ECN_MARKED_BYTES,
+        {true, true}},
+};
 
-    static const auto &  _queue_stat_attr_map =
-            * new std::unordered_map<nas_attr_id_t, stat_attr_capability, std::hash<int>>
-    {
-        {BASE_QOS_QUEUE_STAT_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_DISCARD_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_DISCARD_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_DISCARD_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_DISCARD_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_DISCARD_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_DISCARD_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_DISCARD_DROPPED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_DISCARD_DROPPED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_CURRENT_OCCUPANCY_BYTES,
-                {true, false}},
-        {BASE_QOS_QUEUE_STAT_WATERMARK_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_SHARED_CURRENT_OCCUPANCY_BYTES,
-                {true, false}},
-        {BASE_QOS_QUEUE_STAT_SHARED_WATERMARK_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_WRED_ECN_MARKED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_GREEN_WRED_ECN_MARKED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_WRED_ECN_MARKED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_YELLOW_WRED_ECN_MARKED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_WRED_ECN_MARKED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_RED_WRED_ECN_MARKED_BYTES,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_WRED_ECN_MARKED_PACKETS,
-                {true, true}},
-        {BASE_QOS_QUEUE_STAT_WRED_ECN_MARKED_BYTES,
-                {true, true}},
-
-       };
-
+static bool _queue_stat_attr_get(nas_attr_id_t attr_id,
+           stat_attr_capability * p_stat_attr, bool snapshot)
+{
     try {
         *p_stat_attr = _queue_stat_attr_map.at(attr_id);
+        if ((snapshot == true) && (p_stat_attr->snapshot_ok == false))
+           return false;
     }
     catch (...) {
         return false;
     }
     return true;
+}
+
+static void _queue_all_stat_id_get (std::vector<BASE_QOS_QUEUE_STAT_t>* counter_ids,
+                                    bool snapshot)
+{
+    for (auto it = _queue_stat_attr_map.begin();
+              it != _queue_stat_attr_map.end(); ++it) {
+         if (snapshot != true)
+            counter_ids->push_back((BASE_QOS_QUEUE_STAT_t)it->first);
+         else if((snapshot == true) && (it->second.snapshot_ok == true))
+            counter_ids->push_back((BASE_QOS_QUEUE_STAT_t)it->first);
+    }
+}
+
+/**
+  * This function provides NAS-QoS queue stats read function
+  * @Param    Standard CPS API params
+  * @Return   Standard Error Code
+  */
+static cps_api_return_code_t nas_qos_cps_api_one_queue_stat_read (uint32_t switch_id,
+                      cps_api_get_params_t * param,
+                      nas_qos_queue *queue_p,
+                      uint_t nas_mmu_index,
+                      bool   snapshot,
+                      std::vector<BASE_QOS_QUEUE_STAT_t> counter_ids)
+{
+    if (queue_p == NULL)
+        return  cps_api_ret_code_ERR;
+
+    ndi_obj_id_t ndi_queue_id = queue_p->ndi_obj_id();
+    if (nas_mmu_index != 0) {
+        ndi_queue_id = queue_p->get_shadow_queue_id(nas_mmu_index);
+        if (ndi_queue_id == NDI_QOS_NULL_OBJECT_ID)
+            return cps_api_ret_code_OK;
+
+    }
+
+    std::vector<uint64_t> counters(counter_ids.size());
+    if (ndi_qos_get_extended_queue_statistics(queue_p->get_ndi_port_id(),
+                                     ndi_queue_id,
+                                     &counter_ids[0],
+                                     counter_ids.size(),
+                                     &counters[0], (snapshot ? true : false),
+                                     snapshot) != STD_ERR_OK) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get failed");
+        return cps_api_ret_code_ERR;
+    }
+
+    // return stats objects to cps-app
+    cps_api_object_t ret_obj = cps_api_object_list_create_obj_and_append(param->list);
+    if (ret_obj == NULL) {
+        return cps_api_ret_code_ERR;
+    }
+    cps_api_key_from_attr_with_qual(cps_api_object_key(ret_obj),
+            BASE_QOS_QUEUE_STAT_OBJ,
+            cps_api_qualifier_TARGET);
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_SWITCH_ID, switch_id);
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_PORT_ID, queue_p->get_port_id());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_TYPE, queue_p->get_type());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER, queue_p->get_local_queue_id());
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_MMU_INDEX, nas_mmu_index);
+    cps_api_object_attr_add_u32(ret_obj, BASE_QOS_QUEUE_STAT_SNAPSHOT, snapshot);
+
+    for (uint_t i=0; i< counter_ids.size(); i++) {
+        cps_api_object_attr_add_u64(ret_obj, counter_ids[i], counters[i]);
+    }
+    return cps_api_ret_code_OK;
 }
 
 /**
@@ -1212,50 +1281,33 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
                                             cps_api_get_params_t * param,
                                             size_t ix)
 {
-
     cps_api_object_t obj = cps_api_object_list_get(param->filters, ix);
-    cps_api_object_attr_t port_id_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_PORT_ID);
+    cps_api_object_attr_t port_id_attr    = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_PORT_ID);
     cps_api_object_attr_t queue_type_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_TYPE);
-    cps_api_object_attr_t queue_num_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER);
+    cps_api_object_attr_t queue_num_attr  = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER);
+    cps_api_object_attr_t mmu_index_attr  = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_MMU_INDEX);
+    cps_api_object_attr_t snapshot_attr   = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_SNAPSHOT);
 
-    if (port_id_attr == NULL ||
-        queue_type_attr == NULL || queue_num_attr == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-                "Incomplete key: port-id, queue type and queue number must be specified\n");
-        return NAS_QOS_E_MISSING_KEY;
-    }
+    uint_t nas_mmu_index = (mmu_index_attr ? cps_api_object_attr_data_u32(mmu_index_attr): 0);
+    bool snapshot = (snapshot_attr ? (bool) cps_api_object_attr_data_u32(snapshot_attr): 0);
+    cps_api_return_code_t rc = 0;
+
     uint32_t switch_id = 0;
     nas_qos_queue_key_t key;
-    key.port_id = cps_api_object_attr_data_u32(port_id_attr);
-    key.type = (BASE_QOS_QUEUE_TYPE_t)cps_api_object_attr_data_u32(queue_type_attr);
-    key.local_queue_id = cps_api_object_attr_data_u32(queue_num_attr);
 
-    if (nas_is_virtual_port(key.port_id))
-        return NAS_QOS_E_FAIL;
-
-    cps_api_object_attr_t mmu_index_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_MMU_INDEX);
-    uint_t nas_mmu_index = (mmu_index_attr? cps_api_object_attr_data_u32(mmu_index_attr): 0);
+    key.port_id = (port_id_attr != NULL) ? cps_api_object_attr_data_u32(port_id_attr) : 0;
+    key.type = (queue_type_attr != NULL) ?
+               (BASE_QOS_QUEUE_TYPE_t) cps_api_object_attr_data_u32(queue_type_attr) :(BASE_QOS_QUEUE_TYPE_t)0;
+    key.local_queue_id = (queue_num_attr != NULL) ? cps_api_object_attr_data_u32(queue_num_attr) : 0;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, port_id %u queue type %u, queue_number %u stat\n",
-            switch_id, key.port_id, key.type, key.local_queue_id);
-
-    std_mutex_simple_lock_guard p_m(&queue_mutex);
-
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
-    }
-
-    nas_qos_queue * queue_p = p_switch->get_queue(key);
-    if (queue_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue not found");
-        return NAS_QOS_E_FAIL;
-    }
+               "Read switch id %u, port_id %u queue type %u, queue_number %u "
+               "nas_mmu_index %u snapshot %d stat\n",
+               switch_id, key.port_id, key.type, key.local_queue_id, nas_mmu_index, snapshot);
 
     std::vector<BASE_QOS_QUEUE_STAT_t> counter_ids;
-
+    std::vector<BASE_QOS_QUEUE_STAT_t> snapshot_counter_ids;
+    bool exact_counters = false;
     cps_api_object_it_t it;
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
@@ -1263,70 +1315,147 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
         if (id == BASE_QOS_QUEUE_STAT_SWITCH_ID ||
             id == BASE_QOS_QUEUE_STAT_PORT_ID ||
             id == BASE_QOS_QUEUE_STAT_TYPE ||
-            id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER)
+            id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER ||
+            id == BASE_QOS_QUEUE_STAT_MMU_INDEX ||
+            id == BASE_QOS_QUEUE_STAT_SNAPSHOT ||
+            id == BASE_QOS_QUEUE_STAT_OBJ)
             continue; //key
 
         stat_attr_capability stat_attr;
-        if (_queue_stat_attr_get(id, &stat_attr) != true) {
+        if (_queue_stat_attr_get(id, &stat_attr, snapshot) != true) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %lu, ignored", id);
             continue;
         }
 
         if (stat_attr.read_ok) {
             counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
+            exact_counters = true;
         }
     }
 
     if (counter_ids.size() == 0) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Queue stats get without any counter ids");
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get without any counter ids, Get All Counter Id's");
+        _queue_all_stat_id_get (&counter_ids, false);
+        _queue_all_stat_id_get (&snapshot_counter_ids, true);
+    }
+
+    std_mutex_simple_lock_guard p_m(&queue_mutex);
+    nas_qos_switch *p_switch = NULL;
+    nas_qos_queue  *queue_p = NULL;
+
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    std::vector<uint64_t> counters(counter_ids.size());
+    /* Exact Match with port, type, queue id, mmu_index and snapshot
+     * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
+     */
+    if ((port_id_attr != NULL) && (queue_type_attr != NULL) && (queue_num_attr != NULL) &&
+        ((mmu_index_attr != NULL) || (nas_mmu_index == 0)) &&
+        ((snapshot_attr != NULL) || (snapshot == false))) {
 
-    ndi_obj_id_t ndi_queue_id = queue_p->ndi_obj_id();
-    if (nas_mmu_index != 0)
-        ndi_queue_id = queue_p->get_shadow_queue_id(nas_mmu_index);
+        if (nas_is_virtual_port(key.port_id))
+            return NAS_QOS_E_FAIL;
 
-    if (ndi_qos_get_queue_statistics(queue_p->get_ndi_port_id(),
-                                ndi_queue_id,
-                                &counter_ids[0],
-                                counter_ids.size(),
-                                &counters[0]) != STD_ERR_OK) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get failed");
-        return NAS_QOS_E_FAIL;
-    }
+        queue_p = p_switch->get_queue(key);
+        if (queue_p == NULL) {
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue not found");
+            return NAS_QOS_E_FAIL;
+        }
 
-    // return stats objects to cps-app
-    cps_api_object_t ret_obj = cps_api_object_list_create_obj_and_append(param->list);
-    if (ret_obj == NULL) {
-        return cps_api_ret_code_ERR;
-    }
+        return nas_qos_cps_api_one_queue_stat_read(switch_id, param,
+                      queue_p, nas_mmu_index, snapshot,
+                      (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+    } else {
+        for (queue_iter_t it = p_switch->get_queue_it_begin();
+             it != p_switch->get_queue_it_end();
+             it++) {
 
-    cps_api_key_from_attr_with_qual(cps_api_object_key(ret_obj),
-            BASE_QOS_QUEUE_STAT_OBJ,
-            cps_api_qualifier_TARGET);
-    cps_api_set_key_data(ret_obj, BASE_QOS_QUEUE_STAT_SWITCH_ID,
-            cps_api_object_ATTR_T_U32,
-            &switch_id, sizeof(uint32_t));
-    cps_api_set_key_data(ret_obj, BASE_QOS_QUEUE_STAT_PORT_ID,
-            cps_api_object_ATTR_T_U32,
-            &(key.port_id), sizeof(uint32_t));
-    cps_api_set_key_data(ret_obj, BASE_QOS_QUEUE_STAT_TYPE,
-            cps_api_object_ATTR_T_U32,
-            &(key.type), sizeof(uint32_t));
-    cps_api_set_key_data(ret_obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER,
-            cps_api_object_ATTR_T_U32,
-            &(key.local_queue_id), sizeof(uint32_t));
+            queue_p = &it->second;
+            if ((port_id_attr != NULL) &&
+               ((int)cps_api_object_attr_data_u32(port_id_attr) != queue_p->get_port_id()))
+                continue;
 
-    for (uint_t i=0; i< counter_ids.size(); i++) {
-        cps_api_object_attr_add_u64(ret_obj, counter_ids[i], counters[i]);
+            if (nas_is_virtual_port(queue_p->get_port_id()))
+                continue;
+
+            if ((queue_type_attr != NULL) &&
+               ((BASE_QOS_QUEUE_TYPE_t)cps_api_object_attr_data_u32(queue_type_attr) != queue_p->get_type()))
+                continue;
+
+            if ((queue_num_attr != NULL) &&
+                (cps_api_object_attr_data_u32(queue_num_attr) != queue_p->get_local_queue_id()))
+                continue;
+
+            for (uint_t index = 0;  index <= queue_p->get_shadow_queue_count(); index++) {
+                if ((mmu_index_attr != NULL) && (nas_mmu_index != index))
+                    continue;
+
+                if (snapshot_attr != NULL) {
+                    rc = nas_qos_cps_api_one_queue_stat_read(switch_id, param,
+                         queue_p, index, snapshot,
+                         (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get failed");
+                        continue;
+                    }
+                } else {
+                    rc = nas_qos_cps_api_one_queue_stat_read(switch_id, param,
+                         queue_p, index, false,
+                         (exact_counters ? counter_ids : counter_ids));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get failed");
+                        continue;
+                    }
+                    rc = nas_qos_cps_api_one_queue_stat_read(switch_id, param,
+                         queue_p, index, true,
+                         (exact_counters ? counter_ids : snapshot_counter_ids));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats get failed");
+                        continue;
+                    }
+                }
+            }
+        }
     }
 
     return  cps_api_ret_code_OK;
-
 }
 
+/**
+  * This function provides NAS-QoS queue stats clear function
+  * @Param    Standard CPS API params
+  * @Return   Standard Error Code
+  */
+static cps_api_return_code_t nas_qos_cps_api_one_queue_stat_clear (uint32_t switch_id,
+                      nas_qos_queue *queue_p,
+                      uint_t nas_mmu_index,
+                      bool   snapshot,
+                      std::vector<BASE_QOS_QUEUE_STAT_t> counter_ids)
+{
+    if (queue_p == NULL)
+        return  cps_api_ret_code_ERR;
+
+    ndi_obj_id_t ndi_queue_id = queue_p->ndi_obj_id();
+    if (nas_mmu_index != 0) {
+        ndi_queue_id = queue_p->get_shadow_queue_id(nas_mmu_index);
+        if (ndi_queue_id == NDI_QOS_NULL_OBJECT_ID)
+           return cps_api_ret_code_OK;
+    }
+
+    std::vector<uint64_t> counters(counter_ids.size());
+    if (ndi_qos_clear_extended_queue_statistics(queue_p->get_ndi_port_id(),
+                                  ndi_queue_id,
+                                  &counter_ids[0],
+                                  counter_ids.size(), snapshot) != STD_ERR_OK) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear failed");
+        return cps_api_ret_code_ERR;
+    }
+
+    return cps_api_ret_code_OK;
+}
 
 /**
   * This function provides NAS-QoS queue stats CPS API clear function
@@ -1334,58 +1463,44 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_read (void * context,
   * @Param    Standard CPS API params
   * @Return   Standard Error Code
   */
+
 cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
-                                            cps_api_transaction_params_t * param,
+                                            cps_api_transaction_params_t* param,
                                             size_t ix)
 {
-    cps_api_object_t obj = cps_api_object_list_get(param->change_list,ix);
+
+    cps_api_object_t obj = cps_api_object_list_get(param->change_list, ix);
     cps_api_operation_types_t op = cps_api_object_type_operation(cps_api_object_key(obj));
 
     if (op != cps_api_oper_SET)
         return NAS_QOS_E_UNSUPPORTED;
 
-    cps_api_object_attr_t port_id_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_PORT_ID);
+    cps_api_object_attr_t port_id_attr    = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_PORT_ID);
     cps_api_object_attr_t queue_type_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_TYPE);
-    cps_api_object_attr_t queue_num_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER);
+    cps_api_object_attr_t queue_num_attr  = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_QUEUE_NUMBER);
+    cps_api_object_attr_t mmu_index_attr  = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_MMU_INDEX);
+    cps_api_object_attr_t snapshot_attr   = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_SNAPSHOT);
 
-    if (port_id_attr == NULL ||
-        queue_type_attr == NULL || queue_num_attr == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-                "Incomplete key: port-id, queue type and queue number must be specified\n");
-        return NAS_QOS_E_MISSING_KEY;
-    }
+    uint_t nas_mmu_index = (mmu_index_attr ? cps_api_object_attr_data_u32(mmu_index_attr): 0);
+    bool snapshot = (snapshot_attr ? (bool) cps_api_object_attr_data_u32(snapshot_attr): false);
+    cps_api_return_code_t rc = 0;
+
     uint32_t switch_id = 0;
     nas_qos_queue_key_t key;
-    key.port_id = cps_api_object_attr_data_u32(port_id_attr);
-    key.type = (BASE_QOS_QUEUE_TYPE_t)cps_api_object_attr_data_u32(queue_type_attr);
-    key.local_queue_id = cps_api_object_attr_data_u32(queue_num_attr);
 
-    cps_api_object_attr_t mmu_index_attr = cps_api_get_key_data(obj, BASE_QOS_QUEUE_STAT_MMU_INDEX);
-    uint_t nas_mmu_index = (mmu_index_attr? cps_api_object_attr_data_u32(mmu_index_attr): 0);
-
-    if (nas_is_virtual_port(key.port_id))
-        return NAS_QOS_E_FAIL;
+    key.port_id = (port_id_attr != NULL) ? cps_api_object_attr_data_u32(port_id_attr) : 0;
+    key.type = (queue_type_attr != NULL) ?
+               (BASE_QOS_QUEUE_TYPE_t) cps_api_object_attr_data_u32(queue_type_attr) :(BASE_QOS_QUEUE_TYPE_t)0;
+    key.local_queue_id = (queue_num_attr != NULL) ? cps_api_object_attr_data_u32(queue_num_attr) : 0;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
-            "Read switch id %u, port_id %u queue type %u, queue_number %u stat\n",
-            switch_id, key.port_id, key.type, key.local_queue_id);
-
-    std_mutex_simple_lock_guard p_m(&queue_mutex);
-
-    nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
-    if (p_switch == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
-    }
-
-    nas_qos_queue * queue_p = p_switch->get_queue(key);
-    if (queue_p == NULL) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue not found");
-        return NAS_QOS_E_FAIL;
-    }
+               "Clear switch id %u, port_id %u queue type %u, queue_number %u "
+               "nas_mmu_index %u snapshot %d stat\n",
+               switch_id, key.port_id, key.type, key.local_queue_id, nas_mmu_index, snapshot);
 
     std::vector<BASE_QOS_QUEUE_STAT_t> counter_ids;
-
+    std::vector<BASE_QOS_QUEUE_STAT_t> snapshot_counter_ids;
+    bool exact_counters = false;
     cps_api_object_it_t it;
     cps_api_object_it_begin(obj,&it);
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
@@ -1393,38 +1508,112 @@ cps_api_return_code_t nas_qos_cps_api_queue_stat_clear (void * context,
         if (id == BASE_QOS_QUEUE_STAT_SWITCH_ID ||
             id == BASE_QOS_QUEUE_STAT_PORT_ID ||
             id == BASE_QOS_QUEUE_STAT_TYPE ||
-            id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER)
+            id == BASE_QOS_QUEUE_STAT_QUEUE_NUMBER ||
+            id == BASE_QOS_QUEUE_STAT_MMU_INDEX ||
+            id == BASE_QOS_QUEUE_STAT_SNAPSHOT ||
+            id == BASE_QOS_QUEUE_STAT_OBJ)
             continue; //key
 
         stat_attr_capability stat_attr;
-        if (_queue_stat_attr_get(id, &stat_attr) != true) {
+        if (_queue_stat_attr_get(id, &stat_attr, snapshot) != true) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Unknown queue STAT flag: %lu, ignored", id);
             continue;
         }
 
         if (stat_attr.write_ok) {
             counter_ids.push_back((BASE_QOS_QUEUE_STAT_t)id);
+            exact_counters = true;
         }
     }
 
     if (counter_ids.size() == 0) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Queue stats clear without any valid counter ids");
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear without any counter ids, Get All Counter Id's");
+        _queue_all_stat_id_get (&counter_ids, false);
+        _queue_all_stat_id_get (&snapshot_counter_ids, true);
+    }
+
+    std_mutex_simple_lock_guard p_m(&queue_mutex);
+    nas_qos_switch *p_switch = NULL;
+    nas_qos_queue  *queue_p = NULL;
+
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
         return NAS_QOS_E_FAIL;
     }
 
-    ndi_obj_id_t ndi_queue_id = queue_p->ndi_obj_id();
-    if (nas_mmu_index != 0)
-        ndi_queue_id = queue_p->get_shadow_queue_id(nas_mmu_index);
+    /* Exact Match with port, type, queue id, mmu_index and snapshot
+     * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
+     */
+    if ((port_id_attr != NULL) && (queue_type_attr != NULL) && (queue_num_attr != NULL) &&
+        ((mmu_index_attr != NULL) || (nas_mmu_index == 0)) &&
+        ((snapshot_attr != NULL) || (snapshot == false))) {
 
-    if (ndi_qos_clear_queue_stats(queue_p->get_ndi_port_id(),
-                                ndi_queue_id,
-                                &counter_ids[0],
-                                counter_ids.size()) != STD_ERR_OK) {
-        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear failed");
-        return NAS_QOS_E_FAIL;
+        if (nas_is_virtual_port(key.port_id))
+            return NAS_QOS_E_FAIL;
+
+        queue_p = p_switch->get_queue(key);
+        if (queue_p == NULL) {
+            EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue not found");
+            return NAS_QOS_E_FAIL;
+        }
+
+        return nas_qos_cps_api_one_queue_stat_clear(switch_id,
+                      queue_p, nas_mmu_index, snapshot,
+                      (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+    } else {
+        for (queue_iter_t it = p_switch->get_queue_it_begin();
+             it != p_switch->get_queue_it_end();
+             it++) {
+
+            queue_p = &it->second;
+            if ((port_id_attr != NULL) &&
+               ((int)cps_api_object_attr_data_u32(port_id_attr) != queue_p->get_port_id()))
+                continue;
+
+            if (nas_is_virtual_port(queue_p->get_port_id()))
+                continue;
+
+            if ((queue_type_attr != NULL) &&
+               ((BASE_QOS_QUEUE_TYPE_t)cps_api_object_attr_data_u32(queue_type_attr) != queue_p->get_type()))
+                continue;
+
+            if ((queue_num_attr != NULL) &&
+                (cps_api_object_attr_data_u32(queue_num_attr) != queue_p->get_local_queue_id()))
+                continue;
+
+            for (uint_t index = 0;  index <= queue_p->get_shadow_queue_count(); index++) {
+                if ((mmu_index_attr != NULL) && (nas_mmu_index != index))
+                    continue;
+
+                if (snapshot_attr != NULL) {
+                    rc = nas_qos_cps_api_one_queue_stat_clear(switch_id,
+                         queue_p, index, snapshot,
+                         (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear failed");
+                        continue;
+                    }
+                } else {
+                    rc = nas_qos_cps_api_one_queue_stat_clear(switch_id,
+                         queue_p, index, false,
+                         (exact_counters ? counter_ids : counter_ids));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear failed");
+                        continue;
+                    }
+                    rc = nas_qos_cps_api_one_queue_stat_clear(switch_id,
+                         queue_p, index, true,
+                         (exact_counters ? counter_ids : snapshot_counter_ids));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Queue stats clear failed");
+                        continue;
+                    }
+                }
+            }
+        }
     }
-
 
     return  cps_api_ret_code_OK;
-
 }
+

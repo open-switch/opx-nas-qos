@@ -587,7 +587,8 @@ static cps_api_return_code_t nas_qos_cps_api_port_ing_set(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying port ingress %u attr \n",
                      port_ing.get_port_id());
 
-        if (!nas_is_virtual_port(port_id)) {
+        if (!nas_is_virtual_port(port_id) &&
+            port_ing_p->is_created_in_ndi()) {
             nas::attr_set_t modified_attr_list = port_ing.commit_modify(*port_ing_p,
                                                         (sav_obj? false: true));
 

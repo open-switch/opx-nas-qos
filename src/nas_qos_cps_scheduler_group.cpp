@@ -891,7 +891,8 @@ static cps_api_return_code_t nas_qos_cps_api_scheduler_group_set(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying scheduler_group %lu attr on port %d \n",
                      scheduler_group.get_scheduler_group_id(), scheduler_group.get_port_id());
 
-        if (!nas_is_virtual_port(scheduler_group.get_port_id())) {
+        if (!nas_is_virtual_port(scheduler_group.get_port_id()) &&
+            scheduler_group_p->is_created_in_ndi()) {
             nas::attr_set_t modified_attr_list = scheduler_group.commit_modify(*scheduler_group_p, (sav_obj? false: true));
 
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "done with commit_modify \n");
