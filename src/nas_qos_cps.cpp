@@ -45,7 +45,6 @@
 #include "nas_qos_cps_buffer_profile.h"
 #include "nas_qos_cps_priority_group.h"
 #include "nas_qos_cps_port_pool.h"
-
 /**
  * This function provides NAS-QoS CPS API read function
  * @Param    Standard CPS API params
@@ -347,5 +346,4 @@ cps_api_return_code_t nas_qos_cps_api_rollback (void * context,
 
     }
 }
-
 

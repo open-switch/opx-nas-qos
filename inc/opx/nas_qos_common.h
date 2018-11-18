@@ -165,7 +165,8 @@ typedef struct nas_qos_map_entry_value_t {
 typedef struct stat_attr_capability_t {
     bool            read_ok;
     bool            write_ok;
-}stat_attr_capability;
+    bool            snapshot_ok;
+} stat_attr_capability;
 
 
 t_std_error nas_qos_port_hqos_init(hal_ifindex_t ifindex, ndi_port_t ndi_port_id);

@@ -411,7 +411,8 @@ static cps_api_return_code_t nas_qos_cps_api_port_pool_set(
     try {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying port_pool: port_id attr \n");
 
-        if (!nas_is_virtual_port(port_id)) {
+        if (!nas_is_virtual_port(port_id) &&
+            port_pool_p->is_created_in_ndi()) {
             nas::attr_set_t modified_attr_list = port_pool.commit_modify(
                                             *port_pool_p, (sav_obj? false: true));
 

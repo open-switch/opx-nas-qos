@@ -33,6 +33,19 @@
 #include "iana-if-type.h"
 #include "nas_if_utils.h"
 #include "dell-base-if-lag.h"
+#include "nas_qos_cps_queue.h"
+#include "nas_qos_cps_policer.h"
+#include "nas_qos_cps_buffer_pool.h"
+#include "nas_qos_cps_buffer_profile.h"
+#include "nas_qos_cps_map.h"
+#include "nas_qos_cps_port_egress.h"
+#include "nas_qos_cps_port_ingress.h"
+#include "nas_qos_cps_port_pool.h"
+#include "nas_qos_cps_priority_group.h"
+#include "nas_qos_cps_scheduler.h"
+#include "nas_qos_cps_scheduler_group.h"
+#include "nas_qos_cps_wred.h"
+#include <map>
 
 static bool nas_qos_if_set_handler(
         cps_api_object_t obj, void *context)
@@ -172,29 +185,217 @@ static t_std_error cps_init ()
 {
     cps_api_operation_handle_t       h;
     cps_api_return_code_t            cps_rc;
-    cps_api_registration_functions_t f;
 
     if ((cps_rc = cps_api_operation_subsystem_init(&h,1))
           != cps_api_ret_code_OK) {
         return STD_ERR(QOS, FAIL, cps_rc);
     }
 
-    memset(&f,0,sizeof(f));
+    typedef struct {
+        cps_api_return_code_t (*_read_function) (void * context, cps_api_get_params_t * param, size_t key_ix); //!< the read db function
+        cps_api_return_code_t (*_write_function)(void * context, cps_api_transaction_params_t * param, size_t index_of_element_being_updated); //!< the set db function
+        cps_api_return_code_t (*_rollback_function)(void * context, cps_api_transaction_params_t * param, size_t index_of_element_being_updated); //!< the set db function
+        cps_api_qualifier_t cat;
+    } qos_cps_init_t;
 
-    f.handle = h;
-    f._read_function = nas_qos_cps_api_read;
-    f._write_function = nas_qos_cps_api_write;
-    f._rollback_function = nas_qos_cps_api_rollback;
+    std::map<cps_api_attr_id_t, qos_cps_init_t> qos_cps_init_map;
 
-    /* Register all QoS object */
-    cps_api_key_init(&f.key,
-                     cps_api_qualifier_TARGET,
-                     (cps_api_object_category_types_t)cps_api_obj_CAT_BASE_QOS,
-                     0, /* register all sub-categories */
-                     0);
+    /* All Stats register with REALTIME  */
+    qos_cps_init_map[BASE_QOS_BUFFER_POOL_STAT_OBJ] = {
+                                                        nas_qos_cps_api_buffer_pool_stat_read,
+                                                        nas_qos_cps_api_buffer_pool_stat_clear,
+                                                        NULL,
+                                                        cps_api_qualifier_REALTIME
+                                                      };
 
-    if ((cps_rc = cps_api_register(&f)) != cps_api_ret_code_OK) {
-        return STD_ERR(QOS, FAIL, cps_rc);
+    qos_cps_init_map[BASE_QOS_PRIORITY_GROUP_STAT_OBJ] = {
+                                                            nas_qos_cps_api_priority_group_stat_read,
+                                                            nas_qos_cps_api_priority_group_stat_clear,
+                                                            NULL,
+                                                            cps_api_qualifier_REALTIME
+                                                         };
+
+    qos_cps_init_map[BASE_QOS_PORT_POOL_STAT_OBJ] = {
+                                                      nas_qos_cps_api_port_pool_stat_read,
+                                                      nas_qos_cps_api_port_pool_stat_clear,
+                                                      NULL,
+                                                      cps_api_qualifier_REALTIME
+                                                    };
+
+    qos_cps_init_map[BASE_QOS_QUEUE_STAT_OBJ] = {
+                                                  nas_qos_cps_api_queue_stat_read,
+                                                  nas_qos_cps_api_queue_stat_clear,
+                                                  NULL,
+                                                  cps_api_qualifier_REALTIME
+                                                };
+    qos_cps_init_map[BASE_QOS_METER_OBJ] = {
+                                                nas_qos_cps_api_policer_read,
+                                                nas_qos_cps_api_policer_write,
+                                                nas_qos_cps_api_policer_rollback,
+                                                cps_api_qualifier_TARGET
+                                           };
+
+    qos_cps_init_map[BASE_QOS_QUEUE_OBJ] = {
+                                                nas_qos_cps_api_queue_read,
+                                                nas_qos_cps_api_queue_write,
+                                                nas_qos_cps_api_queue_rollback,
+                                                cps_api_qualifier_TARGET
+                                           };
+
+    qos_cps_init_map[BASE_QOS_WRED_PROFILE_OBJ] = { nas_qos_cps_api_wred_read,
+                                                    nas_qos_cps_api_wred_write,
+                                                    nas_qos_cps_api_wred_rollback,
+                                                    cps_api_qualifier_TARGET
+                                                  };
+
+    qos_cps_init_map[BASE_QOS_SCHEDULER_PROFILE_OBJ] = { nas_qos_cps_api_scheduler_read,
+                                                         nas_qos_cps_api_scheduler_write,
+                                                         nas_qos_cps_api_scheduler_rollback,
+                                                         cps_api_qualifier_TARGET
+                                                       };
+
+    qos_cps_init_map[BASE_QOS_SCHEDULER_GROUP_OBJ] = {
+                                                        nas_qos_cps_api_scheduler_group_read,
+                                                        nas_qos_cps_api_scheduler_group_write,
+                                                        nas_qos_cps_api_scheduler_group_rollback,
+                                                        cps_api_qualifier_TARGET
+                                                     };
+
+    qos_cps_init_map[BASE_QOS_DOT1P_TO_TC_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                       nas_qos_cps_api_map_write,
+                                                       nas_qos_cps_api_map_rollback,
+                                                       cps_api_qualifier_TARGET
+                                                     };
+
+    qos_cps_init_map[BASE_QOS_DOT1P_TO_COLOR_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                          nas_qos_cps_api_map_write,
+                                                          nas_qos_cps_api_map_rollback,
+                                                          cps_api_qualifier_TARGET
+                                                        };
+
+    qos_cps_init_map[BASE_QOS_DOT1P_TO_TC_COLOR_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                             nas_qos_cps_api_map_write,
+                                                             nas_qos_cps_api_map_rollback,
+                                                             cps_api_qualifier_TARGET
+                                                           };
+
+    qos_cps_init_map[BASE_QOS_DSCP_TO_TC_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                      nas_qos_cps_api_map_write,
+                                                      nas_qos_cps_api_map_rollback,
+                                                      cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_DSCP_TO_COLOR_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                         nas_qos_cps_api_map_write,
+                                                         nas_qos_cps_api_map_rollback,
+                                                         cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_DSCP_TO_TC_COLOR_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                            nas_qos_cps_api_map_write,
+                                                            nas_qos_cps_api_map_rollback,
+                                                            cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_TO_DOT1P_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                       nas_qos_cps_api_map_write,
+                                                       nas_qos_cps_api_map_rollback,
+                                                       cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_TO_DSCP_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                      nas_qos_cps_api_map_write,
+                                                      nas_qos_cps_api_map_rollback,
+                                                      cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_COLOR_TO_DOT1P_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                             nas_qos_cps_api_map_write,
+                                                             nas_qos_cps_api_map_rollback,
+                                                             cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_COLOR_TO_DSCP_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                            nas_qos_cps_api_map_write,
+                                                            nas_qos_cps_api_map_rollback,
+                                                            cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_TO_QUEUE_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                       nas_qos_cps_api_map_write,
+                                                       nas_qos_cps_api_map_rollback,
+                                                       cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_TC_TO_PRIORITY_GROUP_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                                nas_qos_cps_api_map_write,
+                                                                nas_qos_cps_api_map_rollback,
+                                                                cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PRIORITY_GROUP_TO_PFC_PRIORITY_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                                          nas_qos_cps_api_map_write,
+                                                                          nas_qos_cps_api_map_rollback,
+                                                                          cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PFC_PRIORITY_TO_QUEUE_MAP_OBJ] = { nas_qos_cps_api_map_read,
+                                                                 nas_qos_cps_api_map_write,
+                                                                 nas_qos_cps_api_map_rollback,
+                                                                 cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PORT_INGRESS_OBJ] = { nas_qos_cps_api_port_ingress_read,
+                                                    nas_qos_cps_api_port_ingress_write,
+                                                    nas_qos_cps_api_port_ingress_rollback,
+                                                    cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PORT_EGRESS_OBJ] = { nas_qos_cps_api_port_egress_read,
+                                                   nas_qos_cps_api_port_egress_write,
+                                                   nas_qos_cps_api_port_egress_rollback,
+                                                   cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_BUFFER_POOL_OBJ] = { nas_qos_cps_api_buffer_pool_read,
+                                                   nas_qos_cps_api_buffer_pool_write,
+                                                   nas_qos_cps_api_buffer_pool_rollback,
+                                                   cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_BUFFER_PROFILE_OBJ] = { nas_qos_cps_api_buffer_profile_read,
+                                                      nas_qos_cps_api_buffer_profile_write,
+                                                      nas_qos_cps_api_buffer_profile_rollback,
+                                                      cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PRIORITY_GROUP_OBJ] = { nas_qos_cps_api_priority_group_read,
+                                                      nas_qos_cps_api_priority_group_write,
+                                                      nas_qos_cps_api_priority_group_rollback,
+                                                      cps_api_qualifier_TARGET};
+
+    qos_cps_init_map[BASE_QOS_PORT_POOL_OBJ] = { nas_qos_cps_api_port_pool_read,
+                                                 nas_qos_cps_api_port_pool_write,
+                                                 nas_qos_cps_api_port_pool_rollback,
+                                                 cps_api_qualifier_TARGET};
+
+    /* This cps_api_obj_CAT_BASE_QOS Registeration will be removed once stats magr implementation over */
+    qos_cps_init_map[cps_api_obj_CAT_BASE_QOS] = {
+                                                  nas_qos_cps_api_read,
+                                                  nas_qos_cps_api_write,
+                                                  nas_qos_cps_api_rollback,
+                                                  cps_api_qualifier_TARGET
+                                                 };
+
+    std::map<cps_api_attr_id_t, qos_cps_init_t>::iterator it;
+    qos_cps_init_t qos_cps;
+    cps_api_registration_functions_t f;
+    /* Register All QoS objects */
+    for (it = qos_cps_init_map.begin(); it != qos_cps_init_map.end(); it++ )
+    {
+        qos_cps = it->second;
+        memset(&f,0,sizeof(f));
+        f.handle = h;
+        f._read_function = qos_cps._read_function;
+        f._write_function = qos_cps._write_function;
+        f._rollback_function = qos_cps._rollback_function;
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Resgister Qos %d object with cat %d", it->first, qos_cps.cat);
+
+        if (!cps_api_key_from_attr_with_qual(&f.key, it->first, qos_cps.cat)) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Cannot create a key for qos %d object", it->first);
+            return STD_ERR(QOS, FAIL, 0);
+        } else {
+            if ((cps_rc = cps_api_register(&f)) !=cps_api_ret_code_OK) {
+                EV_LOGGING(QOS, ERR, "NAS-QOS", "Failed to register callback for qos %d object", it->first);
+                return STD_ERR(QOS, FAIL, cps_rc);
+            }
+        }
     }
 
     // Register interface creation/deletion event
