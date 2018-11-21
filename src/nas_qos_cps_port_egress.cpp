@@ -508,7 +508,8 @@ static cps_api_return_code_t nas_qos_cps_api_port_eg_set(
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Modifying port egress %u attr \n",
                      port_eg.get_port_id());
 
-        if (!nas_is_virtual_port(port_id)) {
+        if (!nas_is_virtual_port(port_id) &&
+            port_eg_p->is_created_in_ndi()) {
             nas::attr_set_t modified_attr_list = port_eg.commit_modify(*port_eg_p,
                                                         (sav_obj? false: true));
 

@@ -242,6 +242,8 @@ public:
     // handler upon port deletion
     bool      delete_queue_by_ifindex(hal_ifindex_t port_id);
 
+    queue_iter_t get_queue_it_begin() {return queues.begin();}
+    queue_iter_t get_queue_it_end()   {return queues.end();}
 
     /************* Schedulers *******************/
     t_std_error     add_scheduler (nas_qos_scheduler &t);
@@ -352,6 +354,9 @@ public:
 
 
     bool      delete_pg_by_ifindex(hal_ifindex_t port_id);
+
+    priority_group_iter_t get_priority_group_it_begin() {return priority_groups.begin();}
+    priority_group_iter_t get_priority_group_it_end()   {return priority_groups.end();}
 
     /************* Port Ingress *******************/
     t_std_error             add_port_ingress(nas_qos_port_ingress& t);
