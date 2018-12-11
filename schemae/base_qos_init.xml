@@ -1,3 +1,19 @@
+<!--
+ Copyright (c) 2018 Dell Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License"); you may
+ not use this file except in compliance with the License. You may obtain
+ a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+ THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR
+ CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT
+ LIMITATION ANY IMPLIED WARRANTIES OR CONDITIONS OF TITLE, FITNESS
+ FOR A PARTICULAR PURPOSE, MERCHANTABLITY OR NON-INFRINGEMENT.
+
+ See the Apache Version 2.0 License for specific language governing
+ permissions and limitations under the License.
+-->
+
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Written to XSD 1.0; uncomment assertions and use XSD 1.1 checker for more strict checking -->
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
@@ -6,7 +22,7 @@
   Type definitions
 
   =========================================================================== -->
-  
+
   <!-- Queue type is one of: "UCAST", "MULTICAST" -->
   <xs:simpleType name="queue-type">
     <xs:restriction base="xs:string">
@@ -111,7 +127,7 @@
                   <xs:attribute type="xs:string"      name="scheduler-profile" use="required"/>
                 </xs:complexType>
               </xs:element>
-              
+
               <xs:element name="queue" maxOccurs="unbounded">
                 <xs:complexType>
                   <xs:attribute type="xs:unsignedInt" name="number"            use="required"/>
