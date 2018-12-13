@@ -1,3 +1,4 @@
+#!/bin/bash -e
 #
 # Copyright (c) 2018 Dell Inc.
 #
@@ -14,7 +15,6 @@
 # permissions and limitations under the License.
 #
 
-#!/bin/bash -e
 
 ./nas_qos_policer_unittest
 ./nas_qos_wred_unittest

@@ -1,5 +1,3 @@
-© 2018 OpenSwitch project. All information is contributed to and made available by OPX under the Creative Commons Attribution 4.0 International License (available at http://creativecommons.org/licenses/by/4.0/).
-
 # opx-nas-qos
 This repository contains quality of service (QoS) functionality for the NAS software. It provides functions to configure the policer, queue, scheduler, and mapping as well as port QoS rules.
 
@@ -10,3 +8,4 @@ This repository contains quality of service (QoS) functionality for the NAS soft
 
 See [Architecture](https://github.com/open-switch/opx-docs/wiki/Architecture) for more information on the NAS QoS module.
 
+© 2018 OpenSwitch project. All information is contributed to and made available by OPX under the Creative Commons Attribution 4.0 International License (available at http://creativecommons.org/licenses/by/4.0/).
