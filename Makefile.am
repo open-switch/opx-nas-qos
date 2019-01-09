@@ -36,3 +36,6 @@ libopx_nas_qos_la_LIBADD=-lopx_logging -lopx_nas_ndi -lopx_cps_api_common -lopx_
 
 systemdconfdir=/lib/systemd/system
 systemdconf_DATA = scripts/init/*.service
+
+sosdir=/usr/share/sosreport/sos/plugins
+sos_DATA=sos/*
