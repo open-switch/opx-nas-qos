@@ -1,3 +1,15 @@
+opx-nas-qos (2.4.0+opx9) unstable; urgency=medium
+
+  * feat: Add plugin for sosreport
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 9 Jan 2019 15:45:00 -0800
+
+opx-nas-qos (2.4.0+opx8) unstable; urgency=medium
+
+  * feat: Add flag file to prevent QoS initialization
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 9 Jan 2019 15:27:00 -0800
+
 opx-nas-qos (2.4.0+opx7) unstable; urgency=medium
 
   * Update: Remove duplicated header files from ./inc
