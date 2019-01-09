@@ -18,6 +18,7 @@
 Description=QoS default initialization
 After=opx-cps.service opx-nas.service opx-create-interface.service
 Requires=opx-cps.service opx-nas.service opx-create-interface.service
+ConditionPathExists=!/etc/opx/base_qos_no_init
 
 [Service]
 Type=oneshot
