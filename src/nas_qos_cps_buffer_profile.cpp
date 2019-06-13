@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -440,7 +440,7 @@ static cps_api_return_code_t nas_qos_cps_get_switch_and_buffer_profile_id(
     cps_api_object_attr_t buffer_profile_id_attr = cps_api_get_key_data(obj, BASE_QOS_BUFFER_PROFILE_ID);
 
     if (buffer_profile_id_attr == NULL) {
-        EV_LOGGING(QOS, NOTICE, "QOS", "buffer_profile id not exist in message");
+        EV_LOGGING(QOS, DEBUG, "QOS", "buffer_profile id not exist in message");
         return NAS_QOS_E_MISSING_KEY;
     }
 

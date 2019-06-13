@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -37,6 +37,8 @@
 #include "cps_api_key.h"
 #include "dell-base-qos.h"
 #include "nas_qos_buffer_pool.h"
+#include "cps_api_operation.h"
+#include "std_time_tools.h"
 
 /* Parse the attributes */
 static cps_api_return_code_t  nas_qos_cps_parse_attr(cps_api_object_t obj,
@@ -274,6 +276,12 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
             cps_api_object_clone(tmp_obj, obj);
         }
 
+        // Publish Buffer pool
+        cps_api_object_guard p_obj(cps_api_object_create());
+        cps_api_object_clone(p_obj.get(), obj);
+        cps_api_key_set_qualifier(cps_api_object_key(p_obj.get()), cps_api_qualifier_OBSERVED);
+        cps_api_event_thread_publish(p_obj.get());
+
     } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
                     "NAS buffer_pool Create error code: %d ",
@@ -291,7 +299,6 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_create(
 
         return NAS_QOS_E_FAIL;
     }
-
     return cps_api_ret_code_OK;
 }
 
@@ -376,7 +383,10 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
     if ((rc = nas_qos_cps_get_switch_and_buffer_pool_id(obj, switch_id, buffer_pool_id))
             !=    cps_api_ret_code_OK)
         return rc;
-
+    // Publish Buffer pool
+    cps_api_object_guard p_obj(cps_api_object_create());
+    cps_api_object_clone(p_obj.get(), obj);
+    cps_api_key_set_qualifier(cps_api_object_key(p_obj.get()), cps_api_qualifier_OBSERVED);
 
     nas_qos_switch *p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
@@ -415,6 +425,12 @@ static cps_api_return_code_t nas_qos_cps_api_buffer_pool_delete(
         }
 
         p_switch->remove_buffer_pool(buffer_pool_p->get_buffer_pool_id());
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Publish delete buffer_pool %lu",
+                   buffer_pool_p->get_buffer_pool_id());
+
+        cps_api_event_thread_publish(p_obj.get());
+
 
     } catch (nas::base_exception& e) {
         EV_LOGGING(QOS, NOTICE, "QOS",
@@ -662,10 +678,20 @@ static cps_api_return_code_t nas_qos_cps_api_one_buffer_pool_stat_read (uint32_t
                       nas_qos_buffer_pool *buffer_pool_p,
                       uint_t nas_mmu_index,
                       bool   snapshot,
+                      ndi_stats_mode_t stats_mode,
                       std::vector<BASE_QOS_BUFFER_POOL_STAT_t> counter_ids)
 {
     if (buffer_pool_p == NULL)
         return  cps_api_ret_code_ERR;
+    nas_qos_switch *p_switch = NULL;
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "switch_id %u not found", switch_id);
+        return cps_api_ret_code_ERR;
+    }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true))
+        return cps_api_ret_code_OK;
 
     npu_id_t npu_id = 0;;
     if (buffer_pool_p->get_first_npu_id(npu_id) == false) {
@@ -686,11 +712,14 @@ static cps_api_return_code_t nas_qos_cps_api_one_buffer_pool_stat_read (uint32_t
                                      ndi_pool_id,
                                      &counter_ids[0],
                                      counter_ids.size(),
-                                     &counters[0], (snapshot ? true : false),
+                                     &counters[0], stats_mode,
                                      snapshot) != STD_ERR_OK) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool stats get failed");
         return cps_api_ret_code_ERR;
     }
+
+    if (stats_mode == NAS_NDI_STATS_MODE_SYNC)
+        return cps_api_ret_code_OK;
 
     // return stats objects to cps-app
     cps_api_object_t ret_obj = cps_api_object_list_create_obj_and_append(param->list);
@@ -699,7 +728,7 @@ static cps_api_return_code_t nas_qos_cps_api_one_buffer_pool_stat_read (uint32_t
     }
 
     cps_api_key_from_attr_with_qual(cps_api_object_key(ret_obj),
-            BASE_QOS_BUFFER_POOL_STAT_OBJ, cps_api_qualifier_TARGET);
+            BASE_QOS_BUFFER_POOL_STAT_OBJ, cps_api_qualifier_REALTIME);
 
     cps_api_object_attr_add_u64(ret_obj, BASE_QOS_BUFFER_POOL_STAT_ID, buffer_pool_p->get_buffer_pool_id());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_BUFFER_POOL_STAT_MMU_INDEX, nas_mmu_index);
@@ -708,7 +737,8 @@ static cps_api_return_code_t nas_qos_cps_api_one_buffer_pool_stat_read (uint32_t
     for (uint_t i=0; i< counter_ids.size(); i++) {
         cps_api_object_attr_add_u64(ret_obj, counter_ids[i], counters[i]);
     }
-
+    uint64_t time_from_epoch = std_time_get_current_from_epoch_in_nanoseconds();
+    cps_api_object_set_timestamp(ret_obj,time_from_epoch);
     return cps_api_ret_code_OK;
 }
 
@@ -732,6 +762,8 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
 
     uint32_t switch_id = 0;
     nas_obj_id_t buffer_pool_id = ((pool_id_attr != NULL) ? cps_api_object_attr_data_u64(pool_id_attr) : 0);
+    bool     is_in_sync_done = false;
+    bool     is_eg_sync_done = false;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                "Read switch id %u, pool_id %u nas_mmu_index %u snapshot %d stat\n",
@@ -763,7 +795,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
     }
 
     if (counter_ids.size() == 0) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Buffer pool stats get without any counter ids, Get All Counter Id's");
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool stats get without any counter ids, Get All Counter Id's");
         _buffer_pool_all_stat_id_get (&counter_ids, false);
         _buffer_pool_all_stat_id_get (&snapshot_counter_ids, true);
     }
@@ -775,8 +807,15 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
     p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
+        return cps_api_ret_code_ERR;
     }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true)) {
+        return cps_api_ret_code_OK;
+    }
+
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     /* Exact Match with port, type, queue id, mmu_index and snapshot
      * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
@@ -788,11 +827,22 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
         buffer_pool_p = p_switch->get_buffer_pool(buffer_pool_id);
         if (buffer_pool_p == NULL) {
             EV_LOGGING(QOS, NOTICE, "NAS-QOS", "buffer_pool not found");
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
+        }
+        if ((snapshot == true) && (p_switch->is_snapshot_support == true)) {
+            rc = nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
+                                                      buffer_pool_p, nas_mmu_index, snapshot, NAS_NDI_STATS_MODE_SYNC,
+                                                      (exact_counters ? counter_ids :
+                                                      (snapshot ? snapshot_counter_ids : counter_ids)));
+            if (rc != cps_api_ret_code_OK) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer poll stats sync failed");
+                return rc;
+            }
         }
 
         return nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
                       buffer_pool_p, nas_mmu_index, snapshot,
+                      (snapshot ? NAS_NDI_STATS_MODE_READ_AND_CLEAR : NAS_NDI_STATS_MODE_READ),
                       (exact_counters ? counter_ids :
                       (snapshot ? snapshot_counter_ids : counter_ids)));
     } else {
@@ -805,13 +855,34 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
                 (buffer_pool_id != buffer_pool_p->get_buffer_pool_id()))
                 continue;
 
+
             for (uint_t index = 0;  index <= buffer_pool_p->get_shadow_buffer_pool_count(); index++) {
                 if ((mmu_index_attr != NULL) && (nas_mmu_index != index))
                     continue;
+                if ((p_switch->is_snapshot_support == true) &&
+                    ((snapshot == true) || (snapshot_attr == NULL)) &&
+                    (((is_in_sync_done == false) && (buffer_pool_p->get_type() == BASE_QOS_BUFFER_POOL_TYPE_INGRESS)) ||
+                     ((is_eg_sync_done == false) && (buffer_pool_p->get_type() == BASE_QOS_BUFFER_POOL_TYPE_EGRESS)))){
+                    rc = nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
+                                                                   buffer_pool_p, nas_mmu_index, snapshot, NAS_NDI_STATS_MODE_SYNC,
+                                                                   (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+                    if (rc != cps_api_ret_code_OK) {
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Pool stats sync failed");
+                        continue;
+                    }
+                    if (buffer_pool_p->get_type() == BASE_QOS_BUFFER_POOL_TYPE_INGRESS) {
+                        is_in_sync_done = true;
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Poll stats ingress sync done %d", is_in_sync_done);
+                    } else if (buffer_pool_p->get_type() == BASE_QOS_BUFFER_POOL_TYPE_EGRESS) {
+                        is_eg_sync_done = true;
+                        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Poll stats egress sync done %d", is_eg_sync_done);
+                    }
+                }
 
                 if (snapshot_attr != NULL) {
                     rc = nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
                          buffer_pool_p, index, snapshot,
+                         (snapshot ? NAS_NDI_STATS_MODE_READ_AND_CLEAR : NAS_NDI_STATS_MODE_READ),
                          (exact_counters ? counter_ids :
                          (snapshot ? snapshot_counter_ids : counter_ids)));
                     if (rc != cps_api_ret_code_OK) {
@@ -820,14 +891,15 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_read (void * context,
                     }
                 } else {
                     rc = nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
-                         buffer_pool_p, index, false,
+                         buffer_pool_p, index, false, NAS_NDI_STATS_MODE_READ,
                          (exact_counters ? counter_ids : counter_ids));
                     if (rc != cps_api_ret_code_OK) {
                         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool stats get failed");
                         continue;
                     }
                     rc = nas_qos_cps_api_one_buffer_pool_stat_read(switch_id, param,
-                         buffer_pool_p, index, true,(exact_counters ? counter_ids : snapshot_counter_ids));
+                         buffer_pool_p, index, true, NAS_NDI_STATS_MODE_READ_AND_CLEAR,
+                         (exact_counters ? counter_ids : snapshot_counter_ids));
                     if (rc != cps_api_ret_code_OK) {
                         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool stats get failed");
                         continue;
@@ -854,11 +926,22 @@ static cps_api_return_code_t nas_qos_cps_api_one_buffer_pool_stat_clear (uint32_
     if (buffer_pool_p == NULL)
         return  cps_api_ret_code_ERR;
 
+    nas_qos_switch *p_switch = NULL;
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "switch_id %u not found", switch_id);
+        return cps_api_ret_code_ERR;
+    }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true))
+        return cps_api_ret_code_OK;
+
+
     npu_id_t npu_id = 0;;
     if (buffer_pool_p->get_first_npu_id(npu_id) == false) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS",
                    "npu_id not available, buffer_pool stats read failed");
-        return NAS_QOS_E_FAIL;
+        return cps_api_ret_code_ERR;
     }
 
     ndi_obj_id_t ndi_pool_id = buffer_pool_p->ndi_obj_id(npu_id);
@@ -894,7 +977,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
     cps_api_operation_types_t op = cps_api_object_type_operation(cps_api_object_key(obj));
 
     if (op != cps_api_oper_SET)
-        return NAS_QOS_E_UNSUPPORTED;
+        return cps_api_ret_code_ERR;
 
     cps_api_object_attr_t pool_id_attr    = cps_api_get_key_data(obj, BASE_QOS_BUFFER_POOL_STAT_ID);
     cps_api_object_attr_t mmu_index_attr  = cps_api_get_key_data(obj, BASE_QOS_BUFFER_POOL_STAT_MMU_INDEX);
@@ -936,7 +1019,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
     }
 
     if (counter_ids.size() == 0) {
-        EV_LOGGING(QOS, NOTICE, "NAS-QOS", "Buffer pool stats get without any counter ids, Get All Counter Id's");
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Buffer pool stats get without any counter ids, Get All Counter Id's");
         _buffer_pool_all_stat_id_get (&counter_ids, false);
         _buffer_pool_all_stat_id_get (&snapshot_counter_ids, true);
     }
@@ -948,8 +1031,10 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
     p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
+        return cps_api_ret_code_ERR;
     }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     /* Exact Match with port, type, queue id, mmu_index and snapshot
      * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
@@ -961,7 +1046,7 @@ cps_api_return_code_t nas_qos_cps_api_buffer_pool_stat_clear (void * context,
         buffer_pool_p = p_switch->get_buffer_pool(buffer_pool_id);
         if (buffer_pool_p == NULL) {
             EV_LOGGING(QOS, NOTICE, "NAS-QOS", "buffer_pool not found");
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
         }
 
         return nas_qos_cps_api_one_buffer_pool_stat_clear(switch_id,

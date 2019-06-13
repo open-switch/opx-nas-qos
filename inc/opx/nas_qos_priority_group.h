@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -32,6 +32,8 @@
 #include "nas_base_obj.h"
 #include "nas_ndi_qos.h"
 #include "nas_ndi_common.h"
+#include <string>
+#include "nas_qos_common.h"
 
 class nas_qos_switch;
 
@@ -71,7 +73,7 @@ class nas_qos_priority_group : public nas::base_obj_t
     // If the priority group does not exist in a particular MMU,
     // NULL_OBJECT_ID will be stored at that MMU location.
     std::vector<ndi_obj_id_t> _shadow_ndi_obj_id_list;
-
+    std::string if_name;
 public:
 
     nas_qos_priority_group (nas_qos_switch* p_switch, nas_qos_priority_group_key_t key);
@@ -126,6 +128,8 @@ public:
         else
             return NDI_QOS_NULL_OBJECT_ID;
     }
+    std::string &get_if_name() { return if_name;}
+    void set_if_name() {nas_qos_get_if_index_to_name (key.port_id, if_name);}
 } ;
 
 inline ndi_obj_id_t nas_qos_priority_group::ndi_obj_id () const

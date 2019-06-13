@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Dell EMC <ops-dev@lists.openswitch.net>
 Build-Depends: debhelper (>= 9),dh-autoreconf,dh-systemd,autotools-dev,libopx-common-dev (>= 1.4.0),
                libopx-cps-dev (>= 3.6.2),libopx-logging-dev (>= 2.1.0),libopx-nas-common-dev (>= 6.1.0),
-               opx-ndi-api-dev (>= 6.12.0),libopx-nas-ndi-dev (>= 3.26.0)
+               opx-ndi-api-dev (>= 6.12.0)
 Standards-Version: 3.9.3
 Vcs-Browser: https://github.com/open-switch/opx-nas-qos
 Vcs-Git: https://github.com/open-switch/opx-nas-qos.git

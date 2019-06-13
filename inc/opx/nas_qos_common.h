@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -26,7 +26,7 @@
 
 #include "ietf-inet-types.h"
 #include "nas_ndi_qos.h"
-
+#include <string>
 /** NAS QOS Error Codes */
 #define NAS_QOS_E_NONE          (int)STD_ERR_OK
 #define NAS_QOS_E_MEM           (int)STD_ERR (QOS, NONMEM, 0)
@@ -181,5 +181,6 @@ void nas_qos_port_scheduler_group_association(hal_ifindex_t ifindex, ndi_port_t 
 void nas_qos_port_pool_association(hal_ifindex_t ifindex, ndi_port_t ndi_port_id, bool isAdd);
 bool nas_qos_port_is_initialized(uint32_t switch_id, hal_ifindex_t port_id);
 char * nas_qos_fmt_error_code(t_std_error ec);
-
+t_std_error nas_qos_if_name_to_if_index(hal_ifindex_t *if_index, const char *name);
+t_std_error nas_qos_get_if_index_to_name(hal_ifindex_t if_index, std::string &name);
 #endif
