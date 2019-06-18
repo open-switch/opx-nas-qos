@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -41,6 +41,7 @@
 #include "dell-base-qos.h"
 #include "nas_qos_priority_group.h"
 #include "nas_if_utils.h"
+#include "std_time_tools.h"
 
 #include <vector>
 
@@ -432,7 +433,7 @@ static t_std_error create_port_priority_group(hal_ifindex_t port_id,
         nas_qos_priority_group pg (p_switch, key);
 
         pg.set_priority_group_id(priority_group_id);
-
+        pg.set_if_name();
         // get hw initial settings
         nas_qos_port_pg_fetch_from_hw(ndi_port_id, ndi_priority_group_id, &pg);
 
@@ -781,10 +782,21 @@ static cps_api_return_code_t nas_qos_cps_api_one_priority_group_stat_read (uint3
                       nas_qos_priority_group *priority_group_p,
                       uint_t nas_mmu_index,
                       bool   snapshot,
+                      ndi_stats_mode_t stats_mode,
                       std::vector<BASE_QOS_PRIORITY_GROUP_STAT_t> counter_ids)
 {
     if (priority_group_p == NULL)
         return  cps_api_ret_code_ERR;
+
+    nas_qos_switch *p_switch = NULL;
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "switch_id %u not found", switch_id);
+        return cps_api_ret_code_ERR;
+    }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true))
+        return cps_api_ret_code_OK;
 
     ndi_obj_id_t ndi_pg_id = priority_group_p->ndi_obj_id();
     if (nas_mmu_index != 0) {
@@ -798,11 +810,14 @@ static cps_api_return_code_t nas_qos_cps_api_one_priority_group_stat_read (uint3
                                      ndi_pg_id,
                                      &counter_ids[0],
                                      counter_ids.size(),
-                                     &counters[0], (snapshot ? true : false),
+                                     &counters[0], stats_mode,
                                      snapshot) != STD_ERR_OK) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats get failed");
         return cps_api_ret_code_ERR;
     }
+
+    if (stats_mode == NAS_NDI_STATS_MODE_SYNC)
+        return cps_api_ret_code_OK;
 
     // return stats objects to cps-app
     cps_api_object_t ret_obj = cps_api_object_list_create_obj_and_append(param->list);
@@ -811,16 +826,21 @@ static cps_api_return_code_t nas_qos_cps_api_one_priority_group_stat_read (uint3
     }
     cps_api_key_from_attr_with_qual(cps_api_object_key(ret_obj),
             BASE_QOS_PRIORITY_GROUP_STAT_OBJ,
-            cps_api_qualifier_TARGET);
+            cps_api_qualifier_REALTIME);
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PRIORITY_GROUP_STAT_PORT_ID, priority_group_p->get_port_id());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PRIORITY_GROUP_STAT_LOCAL_ID, priority_group_p->get_local_id());
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX, nas_mmu_index);
     cps_api_object_attr_add_u32(ret_obj, BASE_QOS_PRIORITY_GROUP_STAT_SNAPSHOT, snapshot);
+    cps_api_object_attr_add(ret_obj, BASE_QOS_PRIORITY_GROUP_STAT_IFNAME,
+                                     priority_group_p->get_if_name().c_str(),
+                                     priority_group_p->get_if_name().length() + 1);
+
 
     for (uint_t i=0; i< counter_ids.size(); i++) {
         cps_api_object_attr_add_u64(ret_obj, counter_ids[i], counters[i]);
     }
-
+    uint64_t time_from_epoch = std_time_get_current_from_epoch_in_nanoseconds();
+    cps_api_object_set_timestamp(ret_obj,time_from_epoch);
     return cps_api_ret_code_OK;
 }
 
@@ -836,6 +856,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
 {
     cps_api_object_t obj = cps_api_object_list_get(param->filters, ix);
     cps_api_object_attr_t port_id_attr    = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_PORT_ID);
+    cps_api_object_attr_t if_name_attr    = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_IFNAME);
     cps_api_object_attr_t pg_num_attr     = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_LOCAL_ID);
     cps_api_object_attr_t mmu_index_attr  = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX);
     cps_api_object_attr_t snapshot_attr   = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_SNAPSHOT);
@@ -845,9 +866,22 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
     cps_api_return_code_t rc = 0;
 
     uint32_t switch_id = 0;
-    nas_qos_priority_group_key_t key;
+    nas_qos_priority_group_key_t key = {0};
+    hal_ifindex_t port_id = 0;
+    bool  is_sync_done = false;
 
-    key.port_id = (port_id_attr != NULL) ? cps_api_object_attr_data_u32(port_id_attr) : 0;
+    if (if_name_attr) {
+        char *name =(char *) cps_api_object_attr_data_bin(if_name_attr);
+        if (nas_qos_if_name_to_if_index(&port_id, name) != STD_ERR_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Failed to get ifindex for interface %s",
+                       name);
+            return cps_api_ret_code_ERR;
+        }
+    } else if (port_id_attr) {
+        port_id = cps_api_object_attr_data_u32(port_id_attr);
+    }
+
+    key.port_id = port_id;
     key.local_id = (pg_num_attr != NULL) ? cps_api_object_attr_data_u32(pg_num_attr) : 0;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
@@ -864,6 +898,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
     for ( ; cps_api_object_it_valid(&it) ; cps_api_object_it_next(&it) ) {
         cps_api_attr_id_t id = cps_api_object_attr_id(it.attr);
         if (id == BASE_QOS_PRIORITY_GROUP_STAT_PORT_ID ||
+            id == BASE_QOS_PRIORITY_GROUP_STAT_IFNAME ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_LOCAL_ID ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_SNAPSHOT ||
@@ -895,27 +930,44 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
     p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
+        return cps_api_ret_code_ERR;
     }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true)) {
+        return cps_api_ret_code_OK;
+    }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     /* Exact Match with port, local id, mmu_index and snapshot
      * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
      */
-    if ((port_id_attr != NULL) && (pg_num_attr != NULL) &&
+    if (((if_name_attr != NULL) || (port_id_attr != NULL)) &&
+        (pg_num_attr != NULL) &&
         ((mmu_index_attr != NULL) || (nas_mmu_index == 0)) &&
         ((snapshot_attr != NULL) || (snapshot == false))) {
 
         if (nas_is_virtual_port(key.port_id))
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
 
         priority_group_p = p_switch->get_priority_group(key);
         if (priority_group_p == NULL) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG not found");
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
+        }
+        if ((snapshot == true) && (p_switch->is_snapshot_support == true)) {
+            rc = nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
+                                 priority_group_p, nas_mmu_index, snapshot, NAS_NDI_STATS_MODE_SYNC,
+                                 (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+            if (rc != cps_api_ret_code_OK) {
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats sync failed");
+                return rc;
+            }
         }
 
         return nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
                       priority_group_p, nas_mmu_index, snapshot,
+                      (snapshot ? NAS_NDI_STATS_MODE_READ_AND_CLEAR : NAS_NDI_STATS_MODE_READ),
                       (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
     } else {
         for (priority_group_iter_t it = p_switch->get_priority_group_it_begin();
@@ -923,8 +975,9 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
              it++) {
 
             priority_group_p = &it->second;
-            if ((port_id_attr != NULL) &&
-               ((int)cps_api_object_attr_data_u32(port_id_attr) != priority_group_p->get_port_id()))
+
+            if (((if_name_attr != NULL) || (port_id_attr != NULL)) &&
+                (port_id != priority_group_p->get_port_id()))
                 continue;
 
             if (nas_is_virtual_port(priority_group_p->get_port_id()))
@@ -934,6 +987,21 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
                 (cps_api_object_attr_data_u32(pg_num_attr) != priority_group_p->get_local_id()))
                 continue;
 
+            if ((p_switch->is_snapshot_support == true) &&
+                ((snapshot == true) || (snapshot_attr == NULL)) &&
+                ((is_sync_done == false))){
+                rc = nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
+                                                                  priority_group_p, nas_mmu_index, snapshot, NAS_NDI_STATS_MODE_SYNC,
+                                                                  (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
+                if (rc != cps_api_ret_code_OK) {
+                    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats sync failed");
+                    continue;
+                }
+                is_sync_done = true;
+
+                EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG sync done %d", is_sync_done);
+            }
+
             for (uint_t index = 0;  index <= priority_group_p->get_shadow_pg_count(); index++) {
                 if ((mmu_index_attr != NULL) && (nas_mmu_index != index))
                     continue;
@@ -941,6 +1009,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
                 if (snapshot_attr != NULL) {
                     rc = nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
                          priority_group_p, index, snapshot,
+                         (snapshot ? NAS_NDI_STATS_MODE_READ_AND_CLEAR : NAS_NDI_STATS_MODE_READ),
                          (exact_counters ? counter_ids : (snapshot ? snapshot_counter_ids : counter_ids)));
                     if (rc != cps_api_ret_code_OK) {
                         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats get failed");
@@ -948,14 +1017,14 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_read (void * context,
                     }
                 } else {
                     rc = nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
-                         priority_group_p, index, false,
+                         priority_group_p, index, false, NAS_NDI_STATS_MODE_READ,
                          (exact_counters ? counter_ids : counter_ids));
                     if (rc != cps_api_ret_code_OK) {
                         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats get failed");
                         continue;
                     }
                     rc = nas_qos_cps_api_one_priority_group_stat_read(switch_id, param,
-                         priority_group_p, index, true,
+                         priority_group_p, index, true, NAS_NDI_STATS_MODE_READ_AND_CLEAR,
                          (exact_counters ? counter_ids : snapshot_counter_ids));
                     if (rc != cps_api_ret_code_OK) {
                         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG stats get failed");
@@ -982,6 +1051,17 @@ static cps_api_return_code_t nas_qos_cps_api_one_priority_group_stat_clear (uint
 {
     if (priority_group_p == NULL)
         return  cps_api_ret_code_ERR;
+
+    nas_qos_switch *p_switch = NULL;
+    p_switch = nas_qos_get_switch(switch_id);
+    if (p_switch == NULL) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "switch_id %u not found", switch_id);
+        return cps_api_ret_code_ERR;
+    }
+
+    if ((snapshot == true) && (p_switch->is_snapshot_support != true))
+        return cps_api_ret_code_OK;
+
 
     ndi_obj_id_t ndi_pg_id = priority_group_p->ndi_obj_id();
     if (nas_mmu_index != 0) {
@@ -1020,6 +1100,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
         return NAS_QOS_E_UNSUPPORTED;
 
     cps_api_object_attr_t port_id_attr    = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_PORT_ID);
+    cps_api_object_attr_t if_name_attr    = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_IFNAME);
     cps_api_object_attr_t pg_num_attr     = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_LOCAL_ID);
     cps_api_object_attr_t mmu_index_attr  = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX);
     cps_api_object_attr_t snapshot_attr   = cps_api_get_key_data(obj, BASE_QOS_PRIORITY_GROUP_STAT_SNAPSHOT);
@@ -1029,9 +1110,21 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
     cps_api_return_code_t rc = 0;
 
     uint32_t switch_id = 0;
-    nas_qos_priority_group_key_t key;
+    nas_qos_priority_group_key_t key = {0};
+    hal_ifindex_t port_id = 0;
 
-    key.port_id = (port_id_attr != NULL) ? cps_api_object_attr_data_u32(port_id_attr) : 0;
+    if (if_name_attr) {
+        char *name =(char *) cps_api_object_attr_data_bin(if_name_attr);
+        if (nas_qos_if_name_to_if_index(&port_id, name) != STD_ERR_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Failed to get ifindex for interface %s",
+                       name);
+            return cps_api_ret_code_ERR;
+        }
+    } else if (port_id_attr) {
+        port_id = cps_api_object_attr_data_u32(port_id_attr);
+    }
+
+    key.port_id = port_id;
     key.local_id = (pg_num_attr != NULL) ? cps_api_object_attr_data_u32(pg_num_attr) : 0;
 
     EV_LOGGING(QOS, DEBUG, "NAS-QOS",
@@ -1049,6 +1142,7 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
         cps_api_attr_id_t id = cps_api_object_attr_id(it.attr);
         if (id == BASE_QOS_PRIORITY_GROUP_STAT_PORT_ID ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_LOCAL_ID ||
+            id == BASE_QOS_PRIORITY_GROUP_STAT_IFNAME ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_MMU_INDEX ||
             id == BASE_QOS_PRIORITY_GROUP_STAT_SNAPSHOT ||
             id == BASE_QOS_PRIORITY_GROUP_OBJ)
@@ -1079,23 +1173,26 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
     p_switch = nas_qos_get_switch(switch_id);
     if (p_switch == NULL) {
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "switch_id %u not found", switch_id);
-        return NAS_QOS_E_FAIL;
+        return cps_api_ret_code_ERR;
     }
+
+    std::lock_guard<std::recursive_mutex> switch_lg(p_switch->mtx);
 
     /* Exact Match with port, local id, mmu_index and snapshot
      * default mmu index is 0 and snapshto is fals, these 2 are partial keys.
      */
-    if ((port_id_attr != NULL) && (pg_num_attr != NULL) &&
+    if (((if_name_attr != NULL) || (port_id_attr != NULL)) &&
+        (pg_num_attr != NULL) &&
         ((mmu_index_attr != NULL) || (nas_mmu_index == 0)) &&
         ((snapshot_attr != NULL) || (snapshot == false))) {
 
         if (nas_is_virtual_port(key.port_id))
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
 
         priority_group_p = p_switch->get_priority_group(key);
         if (priority_group_p == NULL) {
             EV_LOGGING(QOS, DEBUG, "NAS-QOS", "PG not found");
-            return NAS_QOS_E_FAIL;
+            return cps_api_ret_code_ERR;
         }
 
         return nas_qos_cps_api_one_priority_group_stat_clear(switch_id,
@@ -1107,8 +1204,8 @@ cps_api_return_code_t nas_qos_cps_api_priority_group_stat_clear (void * context,
              it++) {
 
             priority_group_p = &it->second;
-            if ((port_id_attr != NULL) &&
-               ((int)cps_api_object_attr_data_u32(port_id_attr) != priority_group_p->get_port_id()))
+            if (((if_name_attr != NULL) || (port_id_attr != NULL)) &&
+                (port_id != priority_group_p->get_port_id()))
                 continue;
 
             if (nas_is_virtual_port(priority_group_p->get_port_id()))

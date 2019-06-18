@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -46,6 +46,8 @@
 #include "nas_qos_cps_scheduler_group.h"
 #include "nas_qos_cps_wred.h"
 #include <map>
+#include <iostream>
+#include <string>
 
 static bool nas_qos_if_set_handler(
         cps_api_object_t obj, void *context)
@@ -63,6 +65,25 @@ static bool nas_qos_if_set_handler(
     }
 
     uint32_t ifidx = cps_api_object_attr_data_u32(if_index_attr);
+
+    cps_api_object_attr_t if_type_attr =
+        cps_api_get_key_data(obj, IF_INTERFACES_INTERFACE_TYPE);
+
+    if (if_type_attr == NULL) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Interface message does not have if-type");
+        return true;
+    }
+
+    std::string if_type((char *)cps_api_object_attr_data_bin(if_type_attr));
+
+    bool is_cpu_port = (!if_type.compare(IF_INTERFACE_TYPE_IANAIFT_IANA_INTERFACE_TYPE_BASE_IF_CPU)) ? true : false;
+    bool is_eth_port = (!if_type.compare(IF_INTERFACE_TYPE_IANAIFT_IANA_INTERFACE_TYPE_IANAIFT_ETHERNETCSMACD)) ? true : false;
+    bool is_fc_port = (!if_type.compare(IF_INTERFACE_TYPE_IANAIFT_IANA_INTERFACE_TYPE_IANAIFT_FIBRECHANNEL)) ? true : false;
+
+    if( !is_cpu_port && !is_eth_port && !is_fc_port) {
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Interface type is not cpu or ethernet or fc if-type , ifx %d", ifidx);
+        return true;
+    }
 
     if (op == cps_api_oper_CREATE) {
         nas_qos_if_create_notify(ifidx);
@@ -234,14 +255,6 @@ static t_std_error cps_init ()
                                                 nas_qos_cps_api_policer_rollback,
                                                 cps_api_qualifier_TARGET
                                            };
-
-    qos_cps_init_map[BASE_QOS_QUEUE_OBJ] = {
-                                                nas_qos_cps_api_queue_read,
-                                                nas_qos_cps_api_queue_write,
-                                                nas_qos_cps_api_queue_rollback,
-                                                cps_api_qualifier_TARGET
-                                           };
-
     qos_cps_init_map[BASE_QOS_WRED_PROFILE_OBJ] = { nas_qos_cps_api_wred_read,
                                                     nas_qos_cps_api_wred_write,
                                                     nas_qos_cps_api_wred_rollback,
@@ -363,15 +376,6 @@ static t_std_error cps_init ()
                                                  nas_qos_cps_api_port_pool_write,
                                                  nas_qos_cps_api_port_pool_rollback,
                                                  cps_api_qualifier_TARGET};
-
-    /* This cps_api_obj_CAT_BASE_QOS Registeration will be removed once stats magr implementation over */
-    qos_cps_init_map[cps_api_obj_CAT_BASE_QOS] = {
-                                                  nas_qos_cps_api_read,
-                                                  nas_qos_cps_api_write,
-                                                  nas_qos_cps_api_rollback,
-                                                  cps_api_qualifier_TARGET
-                                                 };
-
     std::map<cps_api_attr_id_t, qos_cps_init_t>::iterator it;
     qos_cps_init_t qos_cps;
     cps_api_registration_functions_t f;
@@ -395,6 +399,26 @@ static t_std_error cps_init ()
                 EV_LOGGING(QOS, ERR, "NAS-QOS", "Failed to register callback for qos %d object", it->first);
                 return STD_ERR(QOS, FAIL, cps_rc);
             }
+        }
+    }
+
+    memset(&f,0,sizeof(f));
+    f.handle = h;
+    f._read_function = nas_qos_cps_api_queue_read;
+    f._write_function = nas_qos_cps_api_queue_write;
+    f._rollback_function = nas_qos_cps_api_queue_rollback;
+
+    EV_LOGGING(QOS, DEBUG, "NAS-QOS", "Resgister Qos %d object with %d",
+               BASE_QOS_QUEUE_OBJ, cps_api_qualifier_TARGET);
+
+    if (!cps_api_key_from_attr_with_qual(&f.key, BASE_QOS_QUEUE_OBJ, cps_api_qualifier_TARGET)) {
+        EV_LOGGING(QOS, ERR, "NAS-QOS", "Cannot create a key for qos %d object", BASE_QOS_QUEUE_OBJ);
+        return STD_ERR(QOS, FAIL, 0);
+    } else {
+        if ((cps_rc = cps_api_register(&f)) != cps_api_ret_code_OK) {
+            EV_LOGGING(QOS, ERR, "NAS-QOS", "Failed to register callback for qos %d object",
+                       BASE_QOS_QUEUE_OBJ);
+            return STD_ERR(QOS, FAIL, cps_rc);
         }
     }
 

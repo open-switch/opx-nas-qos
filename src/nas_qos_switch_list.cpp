@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Dell Inc.
+ * Copyright (c) 2019 Dell Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
  * not use this file except in compliance with the License. You may obtain
@@ -27,7 +27,7 @@
 #include "nas_qos_switch_list.h"
 #include "nas_switch.h"
 #include "nas_ndi_switch.h"
-
+#include "std_utils.h"
 typedef std::unordered_map<uint_t, nas_qos_switch *>  switch_list_t;
 typedef switch_list_t::iterator switch_iter_t;
 
@@ -84,7 +84,22 @@ nas_qos_switch * nas_qos_get_switch(uint_t switch_id)
             delete p_switch;
             return NULL;
         }
+
         EV_LOGGING(QOS, DEBUG, "NAS-QOS", "MAX_SG _LEVEL %d ", p_switch->max_sched_group_level);
+        nas_ndi_switch_param_t param;
+        if (ndi_switch_get_attribute(sw->npus[0], BASE_SWITCH_SWITCHING_ENTITIES_SWITCHING_ENTITY_BST_ENABLE,
+                                     &param) != STD_ERR_OK) {
+            p_switch->is_snapshot_support = false;
+        } else {
+           if ((param.u32 == 0) || (param.u32 == 1))
+              p_switch->is_snapshot_support = true;
+        }
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "BST SUPPORT %d ", p_switch->is_snapshot_support);
+
+        p_switch->cpu_port = nas_switch_get_cpu_port_id(switch_id);
+
+        EV_LOGGING(QOS, DEBUG, "NAS-QOS", "CPU PORT %d ", p_switch->cpu_port);
 
         if (nas_qos_add_switch(switch_id, p_switch) != STD_ERR_OK) {
             delete p_switch;
@@ -257,6 +272,14 @@ void nas_qos_if_create_notify(uint_t ifindex)
         return ;
     }
 
+    if ((intf_ctrl.int_type !=  nas_int_type_PORT) &&
+        (intf_ctrl.int_type !=  nas_int_type_CPU) &&
+        (intf_ctrl.int_type !=  nas_int_type_FC)) {
+        EV_LOGGING(QOS, NOTICE, "QOS-if-create",
+                     "Not valid interface type, type %d ifindex %u in nas-intf.",
+                     intf_ctrl.int_type, ifindex);
+        return;
+    }
     ndi_port_t ndi_port_id;
     ndi_port_id.npu_id = intf_ctrl.npu_id;
     ndi_port_id.npu_port = intf_ctrl.port_id;
@@ -378,3 +401,46 @@ bool nas_qos_port_is_initialized(uint32_t switch_id, hal_ifindex_t port_id)
 
     return p_switch->port_is_initialized(port_id);
 }
+
+t_std_error nas_qos_if_name_to_if_index(hal_ifindex_t *if_index, const char *name)
+{
+
+    interface_ctrl_t intf_ctrl;
+    t_std_error rc = STD_ERR_OK;
+
+    memset(&intf_ctrl, 0, sizeof(interface_ctrl_t));
+
+    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF_NAME;
+    safestrncpy(intf_ctrl.if_name, name, strlen(name)+1);
+
+    if((rc= dn_hal_get_interface_info(&intf_ctrl)) != STD_ERR_OK) {
+        EV_LOGGING(QOS, CRIT, "NAS-QOS",
+                   "Interface %s returned error %d", intf_ctrl.if_name, rc);
+        return STD_ERR(INTERFACE,FAIL, rc);
+    }
+
+    *if_index = intf_ctrl.if_index;
+    return STD_ERR_OK;
+}
+
+t_std_error nas_qos_get_if_index_to_name(hal_ifindex_t if_index, std::string &name)
+{
+    interface_ctrl_t intf_ctrl;
+    t_std_error rc = STD_ERR_OK;
+
+    memset(&intf_ctrl, 0, sizeof(interface_ctrl_t));
+
+    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF;
+    intf_ctrl.if_index = if_index;
+
+    if((rc= dn_hal_get_interface_info(&intf_ctrl)) != STD_ERR_OK) {
+        EV_LOGGING(INTERFACE, DEBUG, "NAS-INT",
+                   "Interface %d returned error %d", \
+                    intf_ctrl.if_index, rc);
+
+        return STD_ERR(INTERFACE,FAIL, rc);
+    }
+    name.assign(intf_ctrl.if_name);
+    return STD_ERR_OK;
+}
+

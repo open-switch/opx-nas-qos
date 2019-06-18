@@ -1,3 +1,16 @@
+opx-nas-qos (2.5.0) unstable; urgency=medium
+
+  * Update: BST stats for BP needs sync for egr/ing types
+  * Update: Snapshot not supported, do not return stats
+  * Update: BST counter sync done only for first queue,pg,pools
+  * Update: correct the lock order
+  * Update: using nanoseconds api for collecting timestamp from epoch
+  * Update: add mutex for protection
+  * Update: S51Xx used mcast q index from 16-23.
+  * Update: Copyright year
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 05 Jun 2019 14:00:00 -0800
+
 opx-nas-qos (2.4.0+opx7) unstable; urgency=medium
 
   * Update: Remove duplicated header files from ./inc
